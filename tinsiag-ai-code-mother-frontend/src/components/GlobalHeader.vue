@@ -1,31 +1,47 @@
 <script setup lang="ts">
-import { ref, computed, watch, type Component } from 'vue'
+import { ref, computed, watch, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { LoginOutlined } from '@ant-design/icons-vue'
+import { LoginOutlined, LogoutOutlined, HomeOutlined, AppstoreOutlined, CodeOutlined } from '@ant-design/icons-vue'
 import { useLoginUserStore } from '@/stores/LoginUser.ts'
-import {LogoutOutlined} from '@ant-design/icons-vue'
 import { userLogout } from '@/api/userController.ts'
 import { message } from 'ant-design-vue'
 
-export interface MenuItem {
-  key: string
-  label: string
-  icon?: Component
-  path?: string
-}
 // 获取登录用户状态
 const loginUserStore = useLoginUserStore()
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
-    menuItems?: MenuItem[]
     title?: string
   }>(),
   {
-    menuItems: () => [],
     title: '小新乁のAI零代码生成平台',
   },
 )
+
+// 菜单配置项
+const originItems = [
+  { key: '/', icon: () => h(HomeOutlined), label: '首页' },
+  { key: '/apps', icon: () => h(AppstoreOutlined), label: '应用' },
+  { key: '/generate', icon: () => h(CodeOutlined), label: '代码生成' },
+  { key: '/admin/usermanage', icon: () => h(AppstoreOutlined), label: '系统管理' },
+]
+
+// 过滤菜单项
+const filterMenus = (menus = originItems) => {
+  return menus?.filter((menu) => {
+    const menuKey = menu?.key as string
+    if (menuKey?.startsWith('/admin')) {
+      const loginUser = loginUserStore.loginUser
+      if (!loginUser || loginUser.userRole !== 'admin') {
+        return false
+      }
+    }
+    return true
+  })
+}
+
+// 展示在菜单的路由数组
+const menuItems = computed(() => filterMenus(originItems))
 
 const router = useRouter()
 const route = useRoute()
@@ -34,7 +50,7 @@ const selectedKeys = ref<string[]>([])
 
 // 根据当前路由同步选中菜单
 const currentMenuKey = computed(() => {
-  const matched = props.menuItems.find((item) => item.path === route.path)
+  const matched = menuItems.value.find((item) => item.key === route.path)
   return matched ? [matched.key] : []
 })
 
@@ -47,10 +63,7 @@ watch(
 )
 
 function onMenuClick({ key }: { key: string }) {
-  const item = props.menuItems.find((m) => m.key === key)
-  if (item?.path) {
-    router.push(item.path)
-  }
+  router.push(key)
 }
 //退出登录
 const doLogout = async () =>{
@@ -68,10 +81,7 @@ const doLogout = async () =>{
   }
 }
 
-function onLogin() {
-  // TODO: 实现登录逻辑
-  console.log('login clicked')
-}
+
 </script>
 
 <template>
@@ -110,7 +120,7 @@ function onLogin() {
         </a-dropdown>
       </div>
       <div v-else>
-        <a-button type="primary" ghost @click="onLogin" href="/user/login">
+        <a-button type="primary" ghost  href="/user/login">
           <template #icon><LoginOutlined /></template>
           登录
         </a-button>

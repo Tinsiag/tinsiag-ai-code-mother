@@ -1,22 +1,11 @@
 <script setup lang="ts">
-import GlobalHeader, { type MenuItem } from '@/components/GlobalHeader.vue'
+import GlobalHeader from '@/components/GlobalHeader.vue'
 import GlobalFooter from '@/components/GlobalFooter.vue'
-import {
-  HomeOutlined,
-  AppstoreOutlined,
-  CodeOutlined,
-} from '@ant-design/icons-vue'
-
-const menuItems: MenuItem[] = [
-  { key: 'home', label: '首页', icon: HomeOutlined, path: '/' },
-  { key: 'apps', label: '应用', icon: AppstoreOutlined, path: '/apps' },
-  { key: 'generate', label: '代码生成', icon: CodeOutlined, path: '/generate' },
-]
 </script>
 
 <template>
   <a-layout class="basic-layout">
-    <GlobalHeader :menu-items="menuItems" />
+    <GlobalHeader />
     <a-layout-content class="basic-layout-content">
       <router-view />
     </a-layout-content>
