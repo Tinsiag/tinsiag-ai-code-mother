@@ -7,6 +7,8 @@ spring:
     url: jdbc:mysql://home.tinsiag.cn:4406/tinsiag_ai_code_mother
     username: admin
     password: 123456
+  profiles:
+    active: local
 
 server:
   port: 8123
