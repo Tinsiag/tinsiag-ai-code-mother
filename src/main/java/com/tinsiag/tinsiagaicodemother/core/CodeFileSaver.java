@@ -10,6 +10,9 @@ import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 
+import static com.tinsiag.tinsiagaicodemother.core.saver.CodeFileSaverTemplate.saveFile;
+
+@Deprecated
 public class CodeFileSaver {
     /**
      * 文件保存根目录
@@ -52,11 +55,5 @@ public class CodeFileSaver {
         return dirPath;
     }
 
-    /**
-     * 保存单个文件
-     */
-    public static  void saveFile(String dirPath, String fileName, String content) {
-        String fullPath = dirPath + File.separator + fileName;
-        FileUtil.writeString(content, fullPath, StandardCharsets.UTF_8);
-    }
+
 }
