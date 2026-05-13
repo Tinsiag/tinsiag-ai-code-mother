@@ -36,3 +36,4 @@ build/
 ### Custom ###
 /src/main/resources/application-local.yaml
 /tmp/
+/.claude/
