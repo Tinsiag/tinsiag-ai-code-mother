@@ -10,7 +10,7 @@ import com.tinsiag.tinsiagaicodemother.constant.UserConstant;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
 import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
-import com.tinsiag.tinsiagaicodemother.model.dto.*;
+import com.tinsiag.tinsiagaicodemother.model.dto.User.*;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.vo.LoginUserVO;
 import com.tinsiag.tinsiagaicodemother.model.vo.UserVO;

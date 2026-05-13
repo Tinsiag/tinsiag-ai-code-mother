@@ -12,7 +12,7 @@ public class MyBatisCodeGenerator {
 
     //prsf快捷键
     //要生成的表
-    private static final String[] TABLE_NAMES = {"user"};
+    private static final String[] TABLE_NAMES = {"app"};
     public static void main(String[] args) {
         //创建数据源
         Dict dict = YamlUtil.loadByPath("application.yaml");

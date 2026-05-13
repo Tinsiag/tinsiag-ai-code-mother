@@ -2,7 +2,7 @@ package com.tinsiag.tinsiagaicodemother.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
-import com.tinsiag.tinsiagaicodemother.model.dto.UserQueryRequest;
+import com.tinsiag.tinsiagaicodemother.model.dto.User.UserQueryRequest;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.vo.LoginUserVO;
 import com.tinsiag.tinsiagaicodemother.model.vo.UserVO;

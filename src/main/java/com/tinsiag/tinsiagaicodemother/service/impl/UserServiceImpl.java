@@ -7,7 +7,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
 import com.tinsiag.tinsiagaicodemother.mapper.UserMapper;
-import com.tinsiag.tinsiagaicodemother.model.dto.UserQueryRequest;
+import com.tinsiag.tinsiagaicodemother.model.dto.User.UserQueryRequest;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.UserRoleEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.LoginUserVO;

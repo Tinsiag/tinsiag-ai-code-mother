@@ -1,4 +1,4 @@
-package com.tinsiag.tinsiagaicodemother.model.dto;
+package com.tinsiag.tinsiagaicodemother.model.dto.User;
 
 import lombok.Data;
 
