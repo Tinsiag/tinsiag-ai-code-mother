@@ -5,6 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
+import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 
 import java.io.File;
@@ -18,11 +19,11 @@ import java.nio.charset.StandardCharsets;
 public abstract class CodeFileSaverTemplate<T> {
     private static final String FILE_ROOT_DIR = System.getProperty("user.dir")+"/tmp/code_output";
 
-    public final File saveCode(T result){
+    public final File saveCode(T result,Long appid){
         // 1. 验证输入
         validateInput(result);
         // 2. 构建唯一目录
-        String baseDirPath  = buildUniqueDir();
+        String baseDirPath  = buildUniqueDir(appid);
         // 3. 保存文件（具体实现交给子类）
         saveFiles(result, baseDirPath);
 
@@ -64,9 +65,10 @@ public abstract class CodeFileSaverTemplate<T> {
      * @return
      */
 
-    protected String buildUniqueDir(){
+    protected String buildUniqueDir(Long appId){
+        ThrowUtils.throwIf(appId == null, ErrorCode.SYSTEM_ERROR, "应用ID不能为空");
         String bizType = getCodeType().getValue();
-        String UniqueDir = StrUtil.format("{}_{}", bizType , IdUtil.getSnowflakeNextId());
+        String UniqueDir = StrUtil.format("{}_{}", bizType , appId);
         String dirPath = FILE_ROOT_DIR + File.separator + UniqueDir;
         FileUtil.mkdir(dirPath);
         return dirPath;

@@ -2,29 +2,34 @@ package com.tinsiag.tinsiagaicodemother.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.tinsiag.tinsiagaicodemother.annotation.AuthCheck;
 import com.tinsiag.tinsiagaicodemother.common.*;
+import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
 import com.tinsiag.tinsiagaicodemother.constant.UserConstant;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
 import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
+import com.tinsiag.tinsiagaicodemother.model.dto.App.*;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
+import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.*;
 import com.tinsiag.tinsiagaicodemother.model.entity.App;
 import com.tinsiag.tinsiagaicodemother.service.AppService;
-import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 应用 控制层。
@@ -41,7 +46,47 @@ public class AppController {
     @Resource
     private UserService userService;
 
+    @GetMapping(value = "/chat/generate/code",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> Chat2GenCode(@RequestParam Long appId ,@RequestParam String message ,HttpServletRequest request){
+        // 参数校验
+        ThrowUtils.throwIf(appId== null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
+        ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
+        User loginUser = userService.getLoginUser(request);
+        Flux<String> contentFlux = appService.chat2GenCode(appId, message, loginUser);
+        return contentFlux.map(chunk->{
+                Map<String,String> wrapper = Map.of("d",chunk);
+                String jsonStr = JSONUtil.toJsonStr(wrapper);
+                return ServerSentEvent.<String>builder()
+                        .data(jsonStr)
+                        .build();
+                })
+                .concatWith(Mono.just(
+                        //发送一个流式结束do
+                        ServerSentEvent.<String> builder()
+                                .event("done")
+                                .data("")
+                                .build()
+                ));
+    }
 
+    /**
+     * 应用部署
+     *
+     * @param appDeployRequest 部署请求
+     * @param request          请求
+     * @return 部署 URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 调用服务部署应用
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
+    }
 
     /**
      * 创建应用

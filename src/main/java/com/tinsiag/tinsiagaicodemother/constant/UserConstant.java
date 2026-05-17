@@ -25,4 +25,5 @@ public interface UserConstant {
     String DEFAULT_PASSWORD = "12345678";
     // endregion
 
+
 }

@@ -26,5 +26,6 @@ public class HtmlCodeFileSaverTemplate  extends CodeFileSaverTemplate<HtmlCodeRe
         if(StrUtil.isBlank(result.getHtmlCode())){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "HTML 代码不能为空");
         }
+
     }
 }
