@@ -15,6 +15,8 @@
 
 <style scoped>
 .global-footer {
+  flex-shrink: 0;
+  margin-top: auto;
   text-align: center;
   padding: 16px 24px;
   background: #f0f2f5;

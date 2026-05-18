@@ -8,3 +8,15 @@ loginUserStore.fetchLoginUser();
 <template>
   <BasicLayout />
 </template>
+
+<style>
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+</style>

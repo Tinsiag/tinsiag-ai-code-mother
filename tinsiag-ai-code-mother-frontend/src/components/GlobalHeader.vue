@@ -1,56 +1,43 @@
 <script setup lang="ts">
-import { ref, computed, watch, h } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { LoginOutlined, LogoutOutlined, HomeOutlined, AppstoreOutlined, CodeOutlined } from '@ant-design/icons-vue'
-import { useLoginUserStore } from '@/stores/LoginUser.ts'
-import { userLogout } from '@/api/userController.ts'
+import { computed, h, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  AppstoreOutlined,
+  HomeOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  UserOutlined,
+} from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
-
-// 获取登录用户状态
-const loginUserStore = useLoginUserStore()
+import { userLogout } from '@/api/userController'
+import { useLoginUserStore } from '@/stores/LoginUser'
 
 withDefaults(
   defineProps<{
     title?: string
   }>(),
   {
-    title: '小新乁のAI零代码生成平台',
+    title: '小新乁の零代码生成平台',
   },
 )
 
-// 菜单配置项
-const originItems = [
-  { key: '/', icon: () => h(HomeOutlined), label: '首页' },
-  { key: '/apps', icon: () => h(AppstoreOutlined), label: '应用' },
-  { key: '/generate', icon: () => h(CodeOutlined), label: '代码生成' },
-  { key: '/admin/usermanage', icon: () => h(AppstoreOutlined), label: '系统管理' },
-]
-
-// 过滤菜单项
-const filterMenus = (menus = originItems) => {
-  return menus?.filter((menu) => {
-    const menuKey = menu?.key as string
-    if (menuKey?.startsWith('/admin')) {
-      const loginUser = loginUserStore.loginUser
-      if (!loginUser || loginUser.userRole !== 'admin') {
-        return false
-      }
-    }
-    return true
-  })
-}
-
-// 展示在菜单的路由数组
-const menuItems = computed(() => filterMenus(originItems))
-
+const loginUserStore = useLoginUserStore()
 const router = useRouter()
 const route = useRoute()
-
 const selectedKeys = ref<string[]>([])
 
-// 根据当前路由同步选中菜单
+const originItems = [
+  { key: '/', icon: () => h(HomeOutlined), label: '首页' },
+  { key: '/admin/appManage', icon: () => h(AppstoreOutlined), label: '应用管理', admin: true },
+  { key: '/admin/userManage', icon: () => h(UserOutlined), label: '用户管理', admin: true },
+]
+
+const menuItems = computed(() =>
+  originItems.filter((item) => !item.admin || loginUserStore.loginUser.userRole === 'admin'),
+)
+
 const currentMenuKey = computed(() => {
-  const matched = menuItems.value.find((item) => item.key === route.path)
+  const matched = menuItems.value.find((item) => route.path === item.key)
   return matched ? [matched.key] : []
 })
 
@@ -65,28 +52,22 @@ watch(
 function onMenuClick({ key }: { key: string }) {
   router.push(key)
 }
-//退出登录
-const doLogout = async () =>{
-  const res = await userLogout();
-  if(res.data.code ===0 && res.data.data){
-    message.success('退出成功');
-    loginUserStore.setLoginUser(
-      {
-        userName: '未登录'
-      }
-    )
+
+const doLogout = async () => {
+  const res = await userLogout()
+  if (res.data.code === 0 && res.data.data) {
+    message.success('退出成功')
+    loginUserStore.setLoginUser({ userName: '未登录' })
     await router.push('/user/login')
-  }else {
-    message.error('退出失败'+res.data.message)
+  } else {
+    message.error(`退出失败，${res.data.message ?? '请稍后重试'}`)
   }
 }
-
-
 </script>
 
 <template>
   <a-layout-header class="global-header">
-    <div class="header-left">
+    <div class="header-left" @click="router.push('/')">
       <img src="/favicon.ico" alt="logo" class="header-logo" />
       <span class="header-title">{{ title }}</span>
     </div>
@@ -103,28 +84,26 @@ const doLogout = async () =>{
       </a-menu-item>
     </a-menu>
     <div class="header-right">
-      <div v-if="loginUserStore.loginUser.id">
-        <a-dropdown>
-          <a-space>
-            <a-avatar :src="loginUserStore.loginUser.userAvatar" />
-            {{ loginUserStore.loginUser.userName ?? '无名' }}
-          </a-space>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item @click="doLogout">
-                <LogoutOutlined/>
-                退出登录
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-      </div>
-      <div v-else>
-        <a-button type="primary" ghost  href="/user/login">
-          <template #icon><LoginOutlined /></template>
-          登录
-        </a-button>
-      </div>
+      <a-dropdown v-if="loginUserStore.loginUser.id">
+        <a-space class="user-entry">
+          <a-avatar :src="loginUserStore.loginUser.userAvatar">
+            {{ loginUserStore.loginUser.userName?.[0] ?? '用' }}
+          </a-avatar>
+          {{ loginUserStore.loginUser.userName ?? '无名用户' }}
+        </a-space>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item @click="doLogout">
+              <LogoutOutlined />
+              退出登录
+            </a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown>
+      <a-button v-else type="primary" ghost @click="router.push('/user/login')">
+        <template #icon><LoginOutlined /></template>
+        登录
+      </a-button>
     </div>
   </a-layout-header>
 </template>
@@ -133,8 +112,10 @@ const doLogout = async () =>{
 .global-header {
   display: flex;
   align-items: center;
+  height: 64px;
   padding: 0 24px;
-  background: rgb(255, 255, 255);
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {
@@ -142,18 +123,20 @@ const doLogout = async () =>{
   align-items: center;
   flex-shrink: 0;
   margin-right: 24px;
+  cursor: pointer;
 }
 
 .header-logo {
-  width: 32px;
-  height: 32px;
-  margin-right: 12px;
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
+  border-radius: 50%;
 }
 
 .header-title {
-  color: rgba(0, 0, 0, 0.88);
+  color: #111827;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -168,6 +151,10 @@ const doLogout = async () =>{
   margin-left: 16px;
 }
 
+.user-entry {
+  cursor: pointer;
+}
+
 @media (max-width: 576px) {
   .global-header {
     padding: 0 12px;
@@ -178,7 +165,7 @@ const doLogout = async () =>{
   }
 
   .header-left {
-    margin-right: 12px;
+    margin-right: 8px;
   }
 }
 </style>

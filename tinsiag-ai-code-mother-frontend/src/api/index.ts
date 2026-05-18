@@ -3,8 +3,10 @@
 // API 更新时间：
 // API 唯一标识：
 import * as userController from './userController'
-import * as health from './health'
+import * as appController from './appController'
+import * as staticResourceController from './staticResourceController'
 export default {
   userController,
-  health,
+  appController,
+  staticResourceController,
 }

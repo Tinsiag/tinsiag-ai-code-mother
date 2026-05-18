@@ -1,32 +1,48 @@
 <script setup lang="ts">
-import GlobalHeader from '@/components/GlobalHeader.vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import GlobalFooter from '@/components/GlobalFooter.vue'
+import GlobalHeader from '@/components/GlobalHeader.vue'
+
+const route = useRoute()
+const isWorkspacePage = computed(() => route.path.startsWith('/app/chat/'))
 </script>
 
 <template>
-  <a-layout class="basic-layout">
+  <a-layout class="basic-layout" :class="{ 'workspace-layout': isWorkspacePage }">
     <GlobalHeader />
-    <a-layout-content class="basic-layout-content">
+    <a-layout-content
+      class="basic-layout-content"
+      :class="{ 'workspace-content': isWorkspacePage }"
+    >
       <router-view />
     </a-layout-content>
-    <GlobalFooter />
+    <GlobalFooter v-if="!isWorkspacePage" />
   </a-layout>
 </template>
 
 <style scoped>
 .basic-layout {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
-.basic-layout-content {
-  flex: 1;
-  padding: 24px 50px;
-  background: #f0f2f5;
+.workspace-layout {
+  height: 100vh;
+  overflow: hidden;
 }
 
-@media (max-width: 576px) {
-  .basic-layout-content {
-    padding: 12px 24px;
-  }
+.basic-layout-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-height: 0;
+  background: #f6f8fb;
+}
+
+.workspace-content {
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 </style>

@@ -1,29 +1,23 @@
 import router from '@/router'
-import { useLoginUserStore } from '@/stores/LoginUser.ts'
+import { useLoginUserStore } from '@/stores/LoginUser'
 import { message } from 'ant-design-vue'
 
 let firstFetchLoginUser = true
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   const loginUserStore = useLoginUserStore()
   let loginUser = loginUserStore.loginUser
 
-  // 首次拉取登录用户信息
   if (firstFetchLoginUser) {
     await loginUserStore.fetchLoginUser()
-    loginUser = loginUserStore.loginUser // 正确获取
+    loginUser = loginUserStore.loginUser
     firstFetchLoginUser = false
   }
 
-  const toUrl = to.fullPath
-
-  if (toUrl.startsWith('/admin')) {
-    if (!loginUser || loginUser.userRole !== 'admin') {
-      message.error('没有权限')
-      next(`/user/login?redirect=${to.fullPath}`)
-      return
-    }
+  if (to.fullPath.startsWith('/admin') && loginUser.userRole !== 'admin') {
+    message.error('没有权限')
+    return `/user/login?redirect=${encodeURIComponent(to.fullPath)}`
   }
 
-  next() // 必须调用，继续路由导航
+  return true
 })
