@@ -45,7 +45,8 @@ const handleSubmit = async (values: API.UserLoginRequest) => {
   if (res.data.code === 0 && res.data.data) {
     loginUserStore.setLoginUser(res.data.data)
     message.success('登录成功')
-    const redirect = typeof route.query.redirect === 'string' ? decodeURIComponent(route.query.redirect) : '/'
+    const redirect =
+      typeof route.query.redirect === 'string' ? decodeURIComponent(route.query.redirect) : '/'
     router.push({ path: redirect, replace: true })
   } else {
     message.error(`登录失败，${res.data.message ?? '请稍后重试'}`)

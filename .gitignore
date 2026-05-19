@@ -37,3 +37,6 @@ build/
 /src/main/resources/application-local.yaml
 /tmp/
 /.claude/
+/tinsiag-ai-code-mother-frontend/public/default-app-cover.png
+/tinsiag-ai-code-mother-frontend/markdown/default.md
+/node_modules/.cache/prettier/.prettier-caches/11edc6d56100bc331860bded5f3b39b6cb79ccfa.json

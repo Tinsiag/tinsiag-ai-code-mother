@@ -6,14 +6,14 @@ import hljs from 'highlight.js'
 import MarkdownIt from 'markdown-it'
 import 'highlight.js/styles/github.css'
 import {
-  ArrowUpOutlined,
   CloudUploadOutlined,
   EditOutlined,
-  PaperClipOutlined,
   RocketOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons-vue'
 import { deployApp, getAppVoById } from '@/api/appController'
+import PromptComposer from '@/components/app/PromptComposer.vue'
+import { getAppPreviewUrl } from '@/config/domain'
+import { useLoginUserStore } from '@/stores/LoginUser'
 
 type ChatMessage = {
   role: 'user' | 'assistant'
@@ -28,6 +28,7 @@ type SseChunkPayload = {
 
 const route = useRoute()
 const router = useRouter()
+const loginUserStore = useLoginUserStore()
 const appId = computed(() => String(route.params.id ?? ''))
 const appInfo = ref<API.AppVO>()
 const messages = ref<ChatMessage[]>([])
@@ -64,11 +65,19 @@ const markdown: MarkdownIt = new MarkdownIt({
 
 const appName = computed(() => appInfo.value?.appName || appInfo.value?.initPrompt || '未命名应用')
 
+const isViewMode = computed(() => route.query.view === '1')
+const isOwnApp = computed(() => {
+  const userId = loginUserStore.loginUser.id
+  const appUserId = appInfo.value?.userId
+  return Boolean(userId && appUserId && String(userId) === String(appUserId))
+})
+const canChat = computed(() => Boolean(appInfo.value && isOwnApp.value))
+
 const previewUrl = computed(() => {
   if (!appInfo.value?.id || !appInfo.value?.codeGenType) {
     return ''
   }
-  return `http://localhost:8123/api/static/${appInfo.value.codeGenType}_${appInfo.value.id}/`
+  return getAppPreviewUrl(appInfo.value.codeGenType, appInfo.value.id)
 })
 
 const renderMarkdown = (content: string) => markdown.render(content)
@@ -170,7 +179,7 @@ const finishGenerating = async () => {
 
 const sendMessage = async (text?: string) => {
   const content = (text ?? inputMessage.value).trim()
-  if (!content || !appId.value || generating.value) {
+  if (!content || !appId.value || generating.value || !canChat.value) {
     return
   }
   inputMessage.value = ''
@@ -254,11 +263,14 @@ const doDeploy = async () => {
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  if (!loginUserStore.loginUser.id) {
+    await loginUserStore.fetchLoginUser().catch(() => {})
+  }
   await fetchApp()
   const autoPrompt = typeof route.query.prompt === 'string' ? route.query.prompt : ''
-  if (route.query.auto === '1' && autoPrompt) {
+  if (!isViewMode.value && route.query.auto === '1' && autoPrompt) {
     sendMessage(autoPrompt)
-  } else if (appInfo.value?.initPrompt) {
+  } else if (!isViewMode.value && appInfo.value?.initPrompt) {
     messages.value.push({ role: 'user', content: appInfo.value.initPrompt })
   }
 })
@@ -306,39 +318,19 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="input-box">
-          <a-textarea
+        <div
+          class="input-box"
+          :class="{ disabled: !canChat }"
+          :title="canChat ? '' : '无法在别人的作品下对话哦~'"
+        >
+          <PromptComposer
             v-model:value="inputMessage"
-            :bordered="false"
-            :auto-size="{ minRows: 3, maxRows: 5 }"
+            :disabled="!canChat"
+            :loading="generating"
+            show-edit
             placeholder="描述越详细，页面越具体，可以一步一步完善生成效果"
-            @pressEnter.ctrl="sendMessage()"
+            @submit="sendMessage()"
           />
-          <div class="input-actions">
-            <a-space>
-              <a-button shape="round">
-                <template #icon><PaperClipOutlined /></template>
-                上传
-              </a-button>
-              <a-button shape="round">
-                <template #icon><EditOutlined /></template>
-                编辑
-              </a-button>
-              <a-button shape="round" disabled>
-                <template #icon><ThunderboltOutlined /></template>
-                优化
-              </a-button>
-            </a-space>
-            <a-button
-              type="primary"
-              shape="circle"
-              size="large"
-              :loading="generating"
-              @click="sendMessage()"
-            >
-              <template #icon><ArrowUpOutlined /></template>
-            </a-button>
-          </div>
         </div>
       </aside>
 
@@ -463,8 +455,7 @@ onBeforeUnmount(() => {
   padding: 0.15em 0.35em;
   background: rgba(15, 23, 42, 0.08);
   border-radius: 6px;
-  font-family:
-    'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 0.92em;
 }
 
@@ -513,11 +504,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.06);
 }
 
-.input-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
+.input-box.disabled {
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.input-box.disabled :deep(textarea) {
+  cursor: not-allowed;
 }
 
 .preview-panel {

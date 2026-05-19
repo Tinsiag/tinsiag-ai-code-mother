@@ -2,15 +2,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import {
-  ArrowUpOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  EyeOutlined,
-  PaperClipOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons-vue'
 import { addApp, deleteApp, listGoodAppVoByPage, listMyAppVoByPage } from '@/api/appController'
+import AppCard from '@/components/app/AppCard.vue'
+import AppDetailModal from '@/components/app/AppDetailModal.vue'
+import PromptComposer from '@/components/app/PromptComposer.vue'
+import { getAppDeployUrl } from '@/config/domain'
 import { useLoginUserStore } from '@/stores/LoginUser'
 
 const router = useRouter()
@@ -23,6 +19,8 @@ const myTotal = ref(0)
 const goodTotal = ref(0)
 const myLoading = ref(false)
 const goodLoading = ref(false)
+const detailOpen = ref(false)
+const detailApp = ref<API.AppVO>()
 
 const mySearch = reactive<API.AppQueryRequest>({
   pageNum: 1,
@@ -39,27 +37,6 @@ const goodSearch = reactive<API.AppQueryRequest>({
 })
 
 const examples = ['波普风电商页面', '企业网站', '电商运营后台', '暗黑话题社区']
-
-
-
-const appCover = (app: API.AppVO) => app.cover || 'public/default.png'
-
-const formatTime = (value?: string) => {
-  if (!value) {
-    return '刚刚'
-  }
-  const diff = Date.now() - new Date(value).getTime()
-  const minute = 60 * 1000
-  const hour = 60 * minute
-  const day = 24 * hour
-  if (diff < hour) {
-    return `${Math.max(1, Math.floor(diff / minute))} 分钟前`
-  }
-  if (diff < day) {
-    return `${Math.floor(diff / hour)} 小时前`
-  }
-  return `${Math.floor(diff / day)} 天前`
-}
 
 const fetchMyApps = async () => {
   if (!loginUserStore.loginUser.id) {
@@ -118,7 +95,7 @@ const createApp = async () => {
         query: { prompt: initPrompt, auto: '1' },
       })
     } else {
-      message.error(`创建失败，${res.data.message ?? '请稍后重试'}`)
+      message.error(`创建失败：${res.data.message ?? '请稍后重试'}`)
     }
   } finally {
     creating.value = false
@@ -127,7 +104,16 @@ const createApp = async () => {
 
 const openApp = (app: API.AppVO) => {
   if (app.id) {
-    router.push(`/app/chat/${app.id}`)
+    router.push({
+      path: `/app/chat/${app.id}`,
+      query: { view: '1' },
+    })
+  }
+}
+
+const openWork = (app: API.AppVO) => {
+  if (app.deployKey) {
+    window.open(getAppDeployUrl(app.deployKey), '_blank')
   }
 }
 
@@ -135,6 +121,11 @@ const editApp = (app: API.AppVO) => {
   if (app.id) {
     router.push(`/app/edit/${app.id}`)
   }
+}
+
+const showDetail = (app: API.AppVO) => {
+  detailApp.value = app
+  detailOpen.value = true
 }
 
 const removeApp = async (app: API.AppVO) => {
@@ -146,7 +137,7 @@ const removeApp = async (app: API.AppVO) => {
     message.success('删除成功')
     fetchMyApps()
   } else {
-    message.error(`删除失败，${res.data.message ?? '请稍后重试'}`)
+    message.error(`删除失败：${res.data.message ?? '请稍后重试'}`)
   }
 }
 
@@ -186,34 +177,14 @@ onMounted(() => {
       <p class="subtitle">与 AI 对话轻松创建应用和网站</p>
 
       <div class="prompt-box">
-        <a-textarea
+        <PromptComposer
           v-model:value="prompt"
-          :bordered="false"
-          :auto-size="{ minRows: 4, maxRows: 6 }"
+          :loading="creating"
+          :min-rows="4"
+          :max-rows="6"
           placeholder="使用 NoCode 创建一个高效的小工具，帮我计算......"
-          @pressEnter.ctrl="createApp"
+          @submit="createApp"
         />
-        <div class="prompt-actions">
-          <a-space>
-            <a-button shape="round">
-              <template #icon><PaperClipOutlined /></template>
-              上传
-            </a-button>
-            <a-button shape="round" disabled>
-              <template #icon><ThunderboltOutlined /></template>
-              优化
-            </a-button>
-          </a-space>
-          <a-button
-            type="primary"
-            shape="circle"
-            size="large"
-            :loading="creating"
-            @click="createApp"
-          >
-            <template #icon><ArrowUpOutlined /></template>
-          </a-button>
-        </div>
       </div>
 
       <a-space class="example-tags" wrap>
@@ -249,33 +220,17 @@ onMounted(() => {
       >
         <template #renderItem="{ item }">
           <a-list-item>
-            <article class="app-card" @click="openApp(item)">
-              <div class="cover-wrap">
-                <img v-if="appCover(item)" :src="appCover(item)" :alt="item.appName" />
-                <div v-else class="cover-placeholder">
-                  <img src="/favicon.ico" alt="" />
-                </div>
-                <div class="card-tools" @click.stop>
-                  <a-tooltip title="查看">
-                    <a-button shape="circle" @click="openApp(item)">
-                      <template #icon><EyeOutlined /></template>
-                    </a-button>
-                  </a-tooltip>
-                  <a-tooltip title="编辑">
-                    <a-button shape="circle" @click="editApp(item)">
-                      <template #icon><EditOutlined /></template>
-                    </a-button>
-                  </a-tooltip>
-                  <a-popconfirm title="确定删除该应用？" @confirm="removeApp(item)">
-                    <a-button danger shape="circle">
-                      <template #icon><DeleteOutlined /></template>
-                    </a-button>
-                  </a-popconfirm>
-                </div>
-              </div>
-              <h3>{{ item.appName || item.initPrompt || '未命名应用' }}</h3>
-              <p>创建于 {{ formatTime(item.createTime) }}</p>
-            </article>
+            <AppCard
+              :app="item"
+              :login-user="loginUserStore.loginUser"
+              editable
+              deletable
+              @open="openApp"
+              @work="openWork"
+              @edit="editApp"
+              @delete="removeApp"
+              @detail="showDetail"
+            />
           </a-list-item>
         </template>
       </a-list>
@@ -303,27 +258,24 @@ onMounted(() => {
       >
         <template #renderItem="{ item }">
           <a-list-item>
-            <article class="app-card featured-card" @click="openApp(item)">
-              <div class="cover-wrap">
-                <img v-if="appCover(item)" :src="appCover(item)" :alt="item.appName" />
-                <div v-else class="cover-placeholder">
-                  <img src="/favicon.ico" alt="" />
-                </div>
-              </div>
-              <div class="featured-meta">
-                <a-avatar :src="item.user?.userAvatar">
-                  {{ item.user?.userName?.[0] ?? '官' }}
-                </a-avatar>
-                <div>
-                  <h3>{{ item.appName || '精选应用' }}</h3>
-                  <p>{{ item.user?.userName ?? 'NoCode 官方' }}</p>
-                </div>
-              </div>
-            </article>
+            <AppCard
+              :app="item"
+              :login-user="loginUserStore.loginUser"
+              @open="openApp"
+              @work="openWork"
+              @detail="showDetail"
+            />
           </a-list-item>
         </template>
       </a-list>
     </section>
+
+    <AppDetailModal
+      v-model:open="detailOpen"
+      :app="detailApp"
+      :login-user="loginUserStore.loginUser"
+      @edit="editApp"
+    />
   </main>
 </template>
 
@@ -380,13 +332,6 @@ onMounted(() => {
   font-size: 18px;
 }
 
-.prompt-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 14px;
-}
-
 .example-tags {
   margin-top: 28px;
 }
@@ -420,84 +365,6 @@ onMounted(() => {
 
 .search-input {
   width: 260px;
-}
-
-.app-card {
-  cursor: pointer;
-}
-
-.cover-wrap {
-  position: relative;
-  height: 230px;
-  overflow: hidden;
-  background: #f7f8fa;
-  border: 1px solid #eef0f3;
-  border-radius: 16px;
-}
-
-.cover-wrap img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top center;
-  transition: transform 0.25s ease;
-}
-
-.app-card:hover .cover-wrap img {
-  transform: scale(1.02);
-}
-
-.cover-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: linear-gradient(135deg, #f8fafc, #edf7f4);
-}
-
-.cover-placeholder img {
-  width: 76px;
-  height: 76px;
-  opacity: 0.55;
-}
-
-.card-tools {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: flex;
-  gap: 8px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.app-card:hover .card-tools {
-  opacity: 1;
-}
-
-.app-card h3 {
-  margin: 18px 12px 4px;
-  color: #111827;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.app-card p {
-  margin: 0 12px;
-  color: #667085;
-  font-size: 15px;
-}
-
-.featured-meta {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  margin-top: 18px;
-}
-
-.featured-meta h3,
-.featured-meta p {
-  margin-left: 0;
 }
 
 @media (max-width: 768px) {

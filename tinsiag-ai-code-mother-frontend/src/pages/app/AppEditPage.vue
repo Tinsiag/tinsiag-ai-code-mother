@@ -74,19 +74,32 @@ onMounted(fetchApp)
       <template #title>应用信息</template>
       <a-spin :spinning="loading">
         <a-form :model="formState" layout="vertical" @finish="submit">
-          <a-form-item label="应用名称" name="appName" :rules="[{ required: true, message: '请输入应用名称' }]">
+          <a-form-item
+            label="应用名称"
+            name="appName"
+            :rules="[{ required: true, message: '请输入应用名称' }]"
+          >
             <a-input v-model:value="formState.appName" placeholder="请输入应用名称" />
           </a-form-item>
           <a-form-item v-if="isAdmin" label="应用封面" name="cover">
             <a-input v-model:value="formState.cover" placeholder="请输入封面 URL" />
           </a-form-item>
           <a-form-item v-if="isAdmin" label="优先级" name="priority">
-            <a-input-number v-model:value="formState.priority" :min="0" :max="99" class="full-input" />
+            <a-input-number
+              v-model:value="formState.priority"
+              :min="0"
+              :max="99"
+              class="full-input"
+            />
           </a-form-item>
           <a-descriptions v-if="appInfo" size="small" :column="1" class="app-desc">
             <a-descriptions-item label="应用 ID">{{ appInfo.id }}</a-descriptions-item>
-            <a-descriptions-item label="创建人">{{ appInfo.user?.userName ?? appInfo.userId }}</a-descriptions-item>
-            <a-descriptions-item label="生成类型">{{ appInfo.codeGenType || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="创建人">{{
+              appInfo.user?.userName ?? appInfo.userId
+            }}</a-descriptions-item>
+            <a-descriptions-item label="生成类型">{{
+              appInfo.codeGenType || '-'
+            }}</a-descriptions-item>
           </a-descriptions>
           <a-space>
             <a-button type="primary" html-type="submit" :loading="saving">保存</a-button>

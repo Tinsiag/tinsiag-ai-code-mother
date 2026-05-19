@@ -3,16 +3,17 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import {
-  deleteAppByAdmin,
-  listAppVoByPageByAdmin,
-  updateAppByAdmin,
-} from '@/api/appController'
+import { deleteAppByAdmin, listAppVoByPageByAdmin, updateAppByAdmin } from '@/api/appController'
+import AppDetailModal from '@/components/app/AppDetailModal.vue'
+import { getAppPreviewUrl } from '@/config/domain'
+import { getAppCover } from '@/utils/appDisplay'
 
 const router = useRouter()
 const data = ref<API.AppVO[]>([])
 const total = ref(0)
 const loading = ref(false)
+const detailOpen = ref(false)
+const detailApp = ref<API.AppVO>()
 
 const searchParams = reactive<API.AppQueryRequest>({
   pageNum: 1,
@@ -29,14 +30,14 @@ const columns = [
   { title: '优先级', dataIndex: 'priority', width: 100 },
   { title: '创建用户', dataIndex: 'user', width: 140 },
   { title: '创建时间', dataIndex: 'createTime', width: 180 },
-  { title: '操作', key: 'action', width: 220 },
+  { title: '操作', key: 'action', width: 260 },
 ]
 
 const staticUrlOf = (record: API.AppVO) => {
   if (!record.id || !record.codeGenType) {
     return ''
   }
-  return `http://localhost:8123/api/static/${record.codeGenType}_${record.id}/`
+  return getAppPreviewUrl(record.codeGenType, record.id)
 }
 
 const fetchData = async () => {
@@ -47,7 +48,7 @@ const fetchData = async () => {
       data.value = res.data.data.records ?? []
       total.value = res.data.data.totalRow ?? 0
     } else {
-      message.error(`获取数据失败，${res.data.message ?? '请稍后重试'}`)
+      message.error(`获取数据失败：${res.data.message ?? '请稍后重试'}`)
     }
   } finally {
     loading.value = false
@@ -73,6 +74,14 @@ const doSearch = () => {
   fetchData()
 }
 
+const resetSearch = () => {
+  searchParams.id = undefined
+  searchParams.appName = undefined
+  searchParams.userId = undefined
+  searchParams.priority = undefined
+  doSearch()
+}
+
 const doDelete = async (id?: API.AppId) => {
   if (!id) {
     return
@@ -82,7 +91,7 @@ const doDelete = async (id?: API.AppId) => {
     message.success('删除成功')
     fetchData()
   } else {
-    message.error(`删除失败，${res.data.message ?? '请稍后重试'}`)
+    message.error(`删除失败：${res.data.message ?? '请稍后重试'}`)
   }
 }
 
@@ -101,8 +110,13 @@ const toggleGood = async (record: API.AppVO) => {
     message.success(isGood ? '已取消精选' : '已设为精选')
     fetchData()
   } else {
-    message.error(`设置失败，${res.data.message ?? '请稍后重试'}`)
+    message.error(`设置失败：${res.data.message ?? '请稍后重试'}`)
   }
+}
+
+const showDetail = (record: API.AppVO) => {
+  detailApp.value = record
+  detailOpen.value = true
 }
 
 onMounted(fetchData)
@@ -127,19 +141,7 @@ onMounted(fetchData)
         <a-form-item>
           <a-space>
             <a-button type="primary" html-type="submit">搜索</a-button>
-            <a-button
-              @click="
-                () => {
-                  searchParams.id = undefined
-                  searchParams.appName = undefined
-                  searchParams.userId = undefined
-                  searchParams.priority = undefined
-                  doSearch()
-                }
-              "
-            >
-              重置
-            </a-button>
+            <a-button @click="resetSearch">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -155,13 +157,11 @@ onMounted(fetchData)
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'cover'">
             <a-image
-              v-if="record.cover || staticUrlOf(record)"
-              :src="record.cover || staticUrlOf(record)"
+              :src="record.cover || staticUrlOf(record) || getAppCover(record)"
               :width="108"
               :height="64"
               class="cover-image"
             />
-            <span v-else>-</span>
           </template>
           <template v-else-if="column.dataIndex === 'priority'">
             <a-tag :color="record.priority === 99 ? 'gold' : 'default'">
@@ -176,6 +176,7 @@ onMounted(fetchData)
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space>
+              <a-button type="link" @click="showDetail(record)">详情</a-button>
               <a-button type="link" @click="router.push(`/app/edit/${record.id}`)">编辑</a-button>
               <a-button type="link" @click="toggleGood(record)">
                 {{ record.priority === 99 ? '取消精选' : '精选' }}
@@ -188,6 +189,12 @@ onMounted(fetchData)
         </template>
       </a-table>
     </a-card>
+
+    <AppDetailModal
+      v-model:open="detailOpen"
+      :app="detailApp"
+      @edit="(app) => router.push(`/app/edit/${app.id}`)"
+    />
   </main>
 </template>
 

@@ -48,31 +48,31 @@ const formState = reactive<API.UserRegisterRequest>({
   userPassword: '',
   checkPassword: '',
 })
-const router = useRouter();
+const router = useRouter()
 
-const validateCheckPassword = async (_rule: any, value: string) => {
+const validateCheckPassword = async (_rule: unknown, value: string) => {
   if (!value) {
-    return Promise.resolve();
+    return Promise.resolve()
   }
   if (value !== formState.userPassword) {
-    return Promise.reject('两次输入的密码不一致');
+    return Promise.reject('两次输入的密码不一致')
   }
-  return Promise.resolve();
+  return Promise.resolve()
 }
 /**
  * 提交表单
  * @param values
  */
-const handleSubmit = async (values: any) => {
-  const res = await register(values);
+const handleSubmit = async (values: API.UserRegisterRequest) => {
+  const res = await register(values)
   if (res.data.code === 0 && res.data.data) {
-    message.success("注册成功");
+    message.success('注册成功')
     router.push({
       path: '/user/login',
-      replace: true
+      replace: true,
     })
   } else {
-    message.error("注册失败" + res.data.message);
+    message.error('注册失败' + res.data.message)
   }
 }
 </script>
