@@ -18,12 +18,15 @@ import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
 import com.tinsiag.tinsiagaicodemother.model.entity.App;
 import com.tinsiag.tinsiagaicodemother.mapper.AppMapper;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
+import com.tinsiag.tinsiagaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.UserVO;
 import com.tinsiag.tinsiagaicodemother.service.AppService;
+import com.tinsiag.tinsiagaicodemother.service.ChatHistoryService;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -45,6 +48,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private UserService userService;
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    @Resource
+    private ChatHistoryService chatHistoryService;
     @Override
     public AppVO getAppVO(App app) {
         if (app == null) {
@@ -109,7 +114,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Override
     public Flux<String> chat2GenCode(Long appId, String message, User loginUser) {
         // 1. 参数校验
-        ThrowUtils.throwIf(appId<=0,ErrorCode.PARAMS_ERROR,"应用ID错误");
+        ThrowUtils.throwIf(appId == null || appId <= 0,ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message),ErrorCode.PARAMS_ERROR,"提示词为空");
 
         // 2 . 获取应用信息
@@ -128,17 +133,30 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
 
         ThrowUtils.throwIf(enumByValue==null,ErrorCode.PARAMS_ERROR,"应用的代码生成类型错误");
 
-        //5 ai生成代码
-
-        return aiCodeGeneratorFacade.generateCodeAndSaveStream(message, enumByValue, appId);
+        //5. 在调用AI前，先保存用户消息到数据库中
+        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser);
+        //6. 调用AI生成代码 （流式）
+        StringBuilder aiMessageBuilder = new StringBuilder();
+        return aiCodeGeneratorFacade.generateCodeAndSaveStream(message, enumByValue, appId)
+                .doOnNext(aiMessageBuilder::append)
+                .doOnComplete(() -> chatHistoryService.addChatMessage(appId, aiMessageBuilder.toString(), ChatHistoryMessageTypeEnum.AI.getValue(), loginUser))
+                .doOnError(throwable -> chatHistoryService.addChatMessage(appId, "AI 回复失败：" + throwable.getMessage(), ChatHistoryMessageTypeEnum.AI.getValue(), loginUser));
 
 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteApp(Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID错误");
+        chatHistoryService.deleteByAppId(appId);
+        return this.removeById(appId);
+    }
+
+    @Override
     public String deployApp(Long appId, User loginUser) {
         //1. 参数校验
-        ThrowUtils.throwIf(appId<=0||appId==null,ErrorCode.PARAMS_ERROR,"应用ID错误");
+        ThrowUtils.throwIf(appId == null || appId <= 0,ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(loginUser==null,ErrorCode.PARAMS_ERROR,"用户未登录");
         //2. 获取应用信息
         App byId = this.getById(appId);
