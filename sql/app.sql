@@ -20,6 +20,8 @@ create table app
     INDEX idx_userId (userId)            -- 提升基于用户 ID 的查询性能
 ) comment '应用' collate = utf8mb4_unicode_ci;
 
+alter table app add column version int DEFAULT 1 not null comment '版本号';
+
 
 -- 对话历史表
 create table chat_history

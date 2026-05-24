@@ -17,12 +17,12 @@ public class ChatHistoryQueryRequest extends PageRequest implements Serializable
     private Long id;
 
     /**
-     * 消息
+     * 消息内容
      */
     private String message;
 
     /**
-     * user/ai
+     * 消息类型（user/ai）
      */
     private String messageType;
 
@@ -37,7 +37,8 @@ public class ChatHistoryQueryRequest extends PageRequest implements Serializable
     private Long userId;
 
     /**
-     * 游标时间，只查询该时间之前的消息
+     * 游标查询 - 最后一条记录的创建时间
+     * 用于分页查询，获取早于此时间的记录
      */
     private LocalDateTime lastCreateTime;
 

@@ -83,8 +83,8 @@ public class AiCodeGeneratorFacade {
     private Flux<String> processCodeStream(Flux<String> CodeStream,CodeGenTypeEnum codeGenTypeEnum,Long appId) {
         // 在流式返回过程中累积完整代码，等完成后再统一解析和保存
         StringBuilder stringBuilder = new StringBuilder();
-        return CodeStream.doOnNext(stringBuilder::append)
-        .doOnNext(chunk -> {
+        return CodeStream.doOnNext(chunk -> {
+            stringBuilder.append(chunk);
             // 实时收集代码片段
         }).doOnComplete(() -> {
             // 流式返回完成后，执行解析与保存
