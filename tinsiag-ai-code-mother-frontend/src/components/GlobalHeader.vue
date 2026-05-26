@@ -3,6 +3,7 @@ import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   AppstoreOutlined,
+  CommentOutlined,
   HomeOutlined,
   LoginOutlined,
   LogoutOutlined,
@@ -29,6 +30,7 @@ const selectedKeys = ref<string[]>([])
 const originItems = [
   { key: '/', icon: () => h(HomeOutlined), label: '首页' },
   { key: '/admin/appManage', icon: () => h(AppstoreOutlined), label: '应用管理', admin: true },
+  { key: '/admin/chatHistoryManage', icon: () => h(CommentOutlined), label: '对话管理', admin: true },
   { key: '/admin/userManage', icon: () => h(UserOutlined), label: '用户管理', admin: true },
 ]
 

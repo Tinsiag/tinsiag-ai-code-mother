@@ -1,5 +1,8 @@
+// @ts-ignore
 /* eslint-disable */
 import request from '@/request'
+
+type AppDeleteRequest = Omit<API.DeleteRequest, 'id'> & { id?: string }
 
 /** 此处后端没有提供注释 POST /app/add */
 export async function addApp(body: API.AppAddRequest, options?: { [key: string]: any }) {
@@ -14,7 +17,10 @@ export async function addApp(body: API.AppAddRequest, options?: { [key: string]:
 }
 
 /** 此处后端没有提供注释 POST /app/admin/delete */
-export async function deleteAppByAdmin(body: API.DeleteRequest, options?: { [key: string]: any }) {
+export async function deleteAppByAdmin(
+  body: AppDeleteRequest,
+  options?: { [key: string]: any },
+) {
   return request<API.BaseResponseBoolean>('/app/admin/delete', {
     method: 'POST',
     headers: {
@@ -86,7 +92,10 @@ export async function chat2GenCode(
 }
 
 /** 此处后端没有提供注释 POST /app/delete */
-export async function deleteApp(body: API.DeleteRequest, options?: { [key: string]: any }) {
+export async function deleteApp(
+  body: AppDeleteRequest,
+  options?: { [key: string]: any },
+) {
   return request<API.BaseResponseBoolean>('/app/delete', {
     method: 'POST',
     headers: {

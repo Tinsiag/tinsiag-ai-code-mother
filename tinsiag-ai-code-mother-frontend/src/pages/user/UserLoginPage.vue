@@ -40,13 +40,32 @@ const loginUserStore = useLoginUserStore()
 const router = useRouter()
 const route = useRoute()
 
+const getSafeRedirect = (redirect: unknown) => {
+  if (typeof redirect !== 'string') {
+    return '/'
+  }
+  if (redirect.startsWith('/')) {
+    return redirect
+  }
+
+  try {
+    const url = new URL(redirect)
+    if (url.origin === window.location.origin) {
+      return `${url.pathname}${url.search}${url.hash}`
+    }
+  } catch {
+    // 非法地址或非 URL 字符串时回到首页
+  }
+
+  return '/'
+}
+
 const handleSubmit = async (values: API.UserLoginRequest) => {
   const res = await userLogin(values)
   if (res.data.code === 0 && res.data.data) {
     loginUserStore.setLoginUser(res.data.data)
     message.success('登录成功')
-    const redirect =
-      typeof route.query.redirect === 'string' ? decodeURIComponent(route.query.redirect) : '/'
+    const redirect = getSafeRedirect(route.query.redirect)
     router.push({ path: redirect, replace: true })
   } else {
     message.error(`登录失败，${res.data.message ?? '请稍后重试'}`)

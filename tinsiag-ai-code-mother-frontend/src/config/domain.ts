@@ -13,5 +13,5 @@ const appPreviewDomain = import.meta.env.VITE_APP_PREVIEW_DOMAIN || 'http://loca
 
 export const getAppDeployUrl = (deployKey: string) => joinUrl(appDeployDomain, deployKey)
 
-export const getAppPreviewUrl = (codeGenType: string, appId: string | number) =>
+export const getAppPreviewUrl = (codeGenType: string, appId: string) =>
   joinUrl(appPreviewDomain, `${codeGenType}_${appId}/`)

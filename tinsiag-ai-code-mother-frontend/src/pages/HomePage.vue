@@ -92,7 +92,7 @@ const createApp = async () => {
     if (res.data.code === 0 && res.data.data) {
       await router.push({
         path: `/app/chat/${res.data.data}`,
-        query: { prompt: initPrompt, auto: '1' },
+        query: { prompt: initPrompt },
       })
     } else {
       message.error(`创建失败：${res.data.message ?? '请稍后重试'}`)
@@ -104,10 +104,7 @@ const createApp = async () => {
 
 const openApp = (app: API.AppVO) => {
   if (app.id) {
-    router.push({
-      path: `/app/chat/${app.id}`,
-      query: { view: '1' },
-    })
+    router.push(`/app/chat/${app.id}`)
   }
 }
 

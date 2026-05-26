@@ -1,5 +1,6 @@
 package com.tinsiag.tinsiagaicodemother.core;
 
+import com.tinsiag.tinsiagaicodemother.ai.AiCodeGenerateServiceFactory;
 import com.tinsiag.tinsiagaicodemother.ai.AiCodegeneraorService;
 import com.tinsiag.tinsiagaicodemother.ai.model.HtmlCodeResult;
 import com.tinsiag.tinsiagaicodemother.ai.model.MultiFileCodeResult;
@@ -19,7 +20,7 @@ import java.io.File;
 public class AiCodeGeneratorFacade {
     // 注入 AI 代码生成服务，负责根据用户提示词生成 HTML / 多文件代码内容
     @Resource
-    private AiCodegeneraorService aiCodegeneraorService;
+    private AiCodeGenerateServiceFactory aiCodeGenerateServiceFactory;
 
     /**
      * 统一入口：根据用户输入的提示词和生成类型，生成代码并保存到本地。
@@ -32,6 +33,7 @@ public class AiCodeGeneratorFacade {
         if (codeGenType == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
         return switch (codeGenType){
             case HTML -> {
                 HtmlCodeResult htmlCodeResult = aiCodegeneraorService.generateHtmlCode(userPrompt);
@@ -57,6 +59,7 @@ public class AiCodeGeneratorFacade {
         if (codeGenType == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
         return switch (codeGenType){
             case HTML -> {
                 Flux<String> codeStream = aiCodegeneraorService.generateHtmlCodeStream(userPrompt);
@@ -106,7 +109,9 @@ public class AiCodeGeneratorFacade {
      * @param userPrompt 用户输入的需求描述
      * @return 保存后的目录/文件对象
      */
-    private File generateAndSaveMutilFileCode(String userPrompt) {
+    private File generateAndSaveMutilFileCode(String userPrompt,Long appId) {
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+
         MultiFileCodeResult multiFileCodeResult = aiCodegeneraorService.generateMultiFileCode(userPrompt);
 
         return  CodeFileSaver.saveMultiFileCode(multiFileCodeResult);
@@ -118,7 +123,9 @@ public class AiCodeGeneratorFacade {
      * @param userPrompt 用户输入的需求描述
      * @return 保存后的目录/文件对象
      */
-    private File generateAndSaveHtmlCode(String userPrompt) {
+    private File generateAndSaveHtmlCode(String userPrompt,Long appId) {
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+
         HtmlCodeResult htmlCodeResult = aiCodegeneraorService.generateHtmlCode(userPrompt);
 
         return CodeFileSaver.saveHtmlCode(htmlCodeResult);

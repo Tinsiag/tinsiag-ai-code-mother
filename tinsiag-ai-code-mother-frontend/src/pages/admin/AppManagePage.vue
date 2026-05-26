@@ -82,7 +82,7 @@ const resetSearch = () => {
   doSearch()
 }
 
-const doDelete = async (id?: API.AppId) => {
+const doDelete = async (id?: string) => {
   if (!id) {
     return
   }
@@ -127,7 +127,7 @@ onMounted(fetchData)
     <a-card :bordered="false">
       <a-form layout="inline" :model="searchParams" @finish="doSearch">
         <a-form-item label="ID">
-          <a-input-number v-model:value="searchParams.id" placeholder="应用 ID" />
+          <a-input v-model:value="searchParams.id" placeholder="应用 ID" allow-clear />
         </a-form-item>
         <a-form-item label="名称">
           <a-input v-model:value="searchParams.appName" placeholder="应用名称" allow-clear />

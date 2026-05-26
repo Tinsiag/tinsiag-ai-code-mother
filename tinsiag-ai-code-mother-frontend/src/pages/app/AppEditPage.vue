@@ -8,7 +8,10 @@ import { useLoginUserStore } from '@/stores/LoginUser'
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
-const appId = computed(() => String(route.params.id ?? ''))
+const appId = computed(() => {
+  const id = route.params.id
+  return Array.isArray(id) ? id[0] : id
+})
 const loading = ref(false)
 const saving = ref(false)
 const appInfo = ref<API.AppVO>()

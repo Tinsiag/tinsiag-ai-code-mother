@@ -24,4 +24,16 @@ class AiCodegeneraorServiceTest {
         MultiFileCodeResult res = aiCodegeneraorService.generateMultiFileCode("做一个简单的小新乁の个人博客，不超过100行");
         Assertions.assertNotNull(res);
     }
+    @Test
+    void testChatMemory() {
+        HtmlCodeResult result = aiCodegeneraorService.generateHtmlCode( "做个程序员鱼皮的工具网站，总代码量不超过 20 行");
+        Assertions.assertNotNull(result);
+        result = aiCodegeneraorService.generateHtmlCode("不要生成网站，告诉我你刚刚做了什么？");
+        Assertions.assertNotNull(result);
+        result = aiCodegeneraorService.generateHtmlCode( "做个程序员鱼皮的工具网站，总代码量不超过 20 行");
+        Assertions.assertNotNull(result);
+        result = aiCodegeneraorService.generateHtmlCode("不要生成网站，告诉我你刚刚做了什么？");
+        Assertions.assertNotNull(result);
+    }
+
 }

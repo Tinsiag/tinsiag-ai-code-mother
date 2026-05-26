@@ -11,6 +11,7 @@ import {
   RocketOutlined,
 } from '@ant-design/icons-vue'
 import { deployApp, getAppVoById } from '@/api/appController'
+import { listAppChatHistory } from '@/api/chatHistoryController'
 import PromptComposer from '@/components/app/PromptComposer.vue'
 import { getAppPreviewUrl } from '@/config/domain'
 import { useLoginUserStore } from '@/stores/LoginUser'
@@ -26,10 +27,15 @@ type SseChunkPayload = {
   d?: string
 }
 
+const DEFAULT_USER_AVATAR = '/default-user-avatar.png'
+
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
-const appId = computed(() => String(route.params.id ?? ''))
+const appId = computed(() => {
+  const id = route.params.id
+  return Array.isArray(id) ? id[0] : id
+})
 const appInfo = ref<API.AppVO>()
 const messages = ref<ChatMessage[]>([])
 const inputMessage = ref('')
@@ -37,6 +43,10 @@ const generating = ref(false)
 const deploying = ref(false)
 const previewReady = ref(false)
 const messageListRef = ref<HTMLElement>()
+const historyLoading = ref(false)
+const hasMoreHistory = ref(false)
+const lastCreateTime = ref<string>()
+const userAvatarLoadFailed = ref(false)
 let eventSource: EventSource | undefined
 let pendingAssistantContent = ''
 let pendingAssistantMessage: ChatMessage | undefined
@@ -65,13 +75,15 @@ const markdown: MarkdownIt = new MarkdownIt({
 
 const appName = computed(() => appInfo.value?.appName || appInfo.value?.initPrompt || '未命名应用')
 
-const isViewMode = computed(() => route.query.view === '1')
 const isOwnApp = computed(() => {
   const userId = loginUserStore.loginUser.id
   const appUserId = appInfo.value?.userId
   return Boolean(userId && appUserId && String(userId) === String(appUserId))
 })
 const canChat = computed(() => Boolean(appInfo.value && isOwnApp.value))
+const userAvatar = computed(() =>
+  userAvatarLoadFailed.value ? DEFAULT_USER_AVATAR : loginUserStore.loginUser.userAvatar || DEFAULT_USER_AVATAR,
+)
 
 const previewUrl = computed(() => {
   if (!appInfo.value?.id || !appInfo.value?.codeGenType) {
@@ -81,6 +93,10 @@ const previewUrl = computed(() => {
 })
 
 const renderMarkdown = (content: string) => markdown.render(content)
+
+const handleUserAvatarError = () => {
+  userAvatarLoadFailed.value = true
+}
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -131,9 +147,58 @@ const fetchApp = async () => {
   const res = await getAppVoById({ id: appId.value })
   if (res.data.code === 0 && res.data.data) {
     appInfo.value = res.data.data
-    previewReady.value = Boolean(previewUrl.value)
   } else {
     message.error(`获取应用失败，${res.data.message ?? '请稍后重试'}`)
+  }
+}
+
+const isUserMessage = (type?: string) => ['user', 'USER'].includes(type ?? '')
+
+const toChatMessage = (record: API.ChatHistory): ChatMessage => {
+  const role = isUserMessage(record.messageType) ? 'user' : 'assistant'
+  const content = record.message ?? ''
+  return {
+    role,
+    content,
+    renderedContent: role === 'assistant' ? renderMarkdown(content) : undefined,
+  }
+}
+
+const fetchHistory = async (loadMore = false) => {
+  if (!appId.value || historyLoading.value) {
+    return
+  }
+  historyLoading.value = true
+  const oldScrollHeight = messageListRef.value?.scrollHeight ?? 0
+  const oldScrollTop = messageListRef.value?.scrollTop ?? 0
+  try {
+    const res = await listAppChatHistory({
+      appId: appId.value,
+      pageSize: 10,
+      lastCreateTime: loadMore ? lastCreateTime.value : undefined,
+    })
+    if (res.data.code === 0 && res.data.data) {
+      const records = (res.data.data.records ?? [])
+        .filter((item) => item.message)
+        .sort((a, b) => String(a.createTime ?? '').localeCompare(String(b.createTime ?? '')))
+      const historyMessages = records.map(toChatMessage)
+      messages.value = loadMore ? [...historyMessages, ...messages.value] : historyMessages
+      if (records.length > 0) {
+        lastCreateTime.value = records[0]?.createTime
+      }
+      const total = res.data.data.totalRow ?? 0
+      hasMoreHistory.value = total > messages.value.length
+      await nextTick()
+      if (loadMore && messageListRef.value) {
+        messageListRef.value.scrollTop = messageListRef.value.scrollHeight - oldScrollHeight + oldScrollTop
+      } else {
+        await scrollToBottom()
+      }
+    } else {
+      message.error(`获取对话历史失败，${res.data.message ?? '请稍后重试'}`)
+    }
+  } finally {
+    historyLoading.value = false
   }
 }
 
@@ -200,7 +265,7 @@ const sendMessage = async (text?: string) => {
 
   closeEventSource()
   const params = new URLSearchParams({
-    appId: appId.value,
+    appId: String(appId.value),
     message: content,
   })
   eventSource = new EventSource(`http://localhost:8123/api/app/chat/generate/code?${params}`, {
@@ -267,11 +332,11 @@ onMounted(async () => {
     await loginUserStore.fetchLoginUser().catch(() => {})
   }
   await fetchApp()
+  await fetchHistory()
+  previewReady.value = Boolean(previewUrl.value && messages.value.length >= 2)
   const autoPrompt = typeof route.query.prompt === 'string' ? route.query.prompt : ''
-  if (!isViewMode.value && route.query.auto === '1' && autoPrompt) {
-    sendMessage(autoPrompt)
-  } else if (!isViewMode.value && appInfo.value?.initPrompt) {
-    messages.value.push({ role: 'user', content: appInfo.value.initPrompt })
+  if (isOwnApp.value && messages.value.length === 0 && (autoPrompt || appInfo.value?.initPrompt)) {
+    sendMessage(autoPrompt || appInfo.value?.initPrompt)
   }
 })
 
@@ -299,13 +364,23 @@ onBeforeUnmount(() => {
     <section class="chat-workspace">
       <aside class="conversation-panel">
         <div ref="messageListRef" class="message-list">
+          <div v-if="hasMoreHistory" class="load-more-history">
+            <a-button type="link" :loading="historyLoading" @click="fetchHistory(true)">
+              加载更多
+            </a-button>
+          </div>
           <div
             v-for="(item, index) in messages"
             :key="index"
             class="message-row"
             :class="item.role"
           >
-            <a-avatar v-if="item.role === 'assistant'" src="/favicon.ico" />
+            <a-avatar
+              v-if="item.role === 'assistant'"
+              class="message-avatar"
+              src="/favicon.ico"
+              :size="32"
+            />
             <div class="message-bubble">
               <a-spin v-if="item.loading && !item.content" size="small" />
               <div
@@ -315,6 +390,13 @@ onBeforeUnmount(() => {
               />
               <pre v-else>{{ item.content }}</pre>
             </div>
+            <a-avatar
+              v-if="item.role === 'user'"
+              class="message-avatar"
+              :src="userAvatar"
+              :size="32"
+              @error="handleUserAvatarError"
+            />
           </div>
         </div>
 
@@ -401,6 +483,11 @@ onBeforeUnmount(() => {
   padding: 18px 18px 140px;
 }
 
+.load-more-history {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
 .message-row {
   display: flex;
   gap: 10px;
@@ -409,6 +496,10 @@ onBeforeUnmount(() => {
 
 .message-row.user {
   justify-content: flex-end;
+}
+
+.message-avatar {
+  flex: 0 0 auto;
 }
 
 .message-bubble {
