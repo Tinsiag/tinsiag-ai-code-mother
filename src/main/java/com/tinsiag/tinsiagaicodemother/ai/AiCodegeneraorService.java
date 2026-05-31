@@ -2,7 +2,9 @@ package com.tinsiag.tinsiagaicodemother.ai;
 
 import com.tinsiag.tinsiagaicodemother.ai.model.HtmlCodeResult;
 import com.tinsiag.tinsiagaicodemother.ai.model.MultiFileCodeResult;
+import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
 import reactor.core.publisher.Flux;
 
 public interface AiCodegeneraorService {
@@ -26,4 +28,7 @@ public interface AiCodegeneraorService {
 
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
     Flux<String> generateMultiFileCodeStream(String prompt);
+
+    @SystemMessage(fromResource = "prompt/vuegen-project-system-prompt.txt")
+    Flux<String> generateVueGenProjectSystemPrompt(@MemoryId long appId, @UserMessage String prompt);
 }

@@ -2,8 +2,15 @@ package com.tinsiag.tinsiagaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.tinsiag.tinsiagaicodemother.ai.tools.FileWriteTool;
+import com.tinsiag.tinsiagaicodemother.config.ReasoningStreamingChatModelConfig;
+import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
+import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
+import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
+import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
@@ -22,32 +29,42 @@ public class AiCodeGenerateServiceFactory {
     @Resource
     private ChatModel chatModel;
 
-    @Resource
+    @Resource(name = "openAiStreamingChatModel")
     private StreamingChatModel streamingChatModel;
 
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
 
     @Resource
+    private StreamingChatModel reasoningStreamingChatModel;
+
+    @Resource
     private ChatHistoryService chatHistoryService;
-    private final Cache<Long, AiCodegeneraorService> serviceCache = Caffeine.newBuilder()
+    private final Cache<String, AiCodegeneraorService> serviceCache = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofMinutes(30))
             .expireAfterAccess(Duration.ofMinutes(10))
             .removalListener((key, value, cause) -> {
-                log.debug("Removing AiCodegeneraorService for appId: {}, cause: {}", key, cause);
+                log.debug("Removing AiCodegeneraorService for CacheKey: {}, cause: {}", key, cause);
             })
             .build();
     /**
+     * 创建AiCodegeneraorService ,为了兼容老逻辑
+     * @return
+     */
+    public AiCodegeneraorService getAiCodeGenerateService(long appId) {
+        return getAiCodeGenerateService(appId,CodeGenTypeEnum.HTML);
+    }
+        /**
      * 创建AiCodegeneraorService
      * @return
      */
-    public AiCodegeneraorService getAiCodeGenerateServiceFactory(long appId) {
-        return serviceCache.get(appId,this::createAiCodeGenerateService);
+    public AiCodegeneraorService getAiCodeGenerateService(long appId,CodeGenTypeEnum codeGenTypeEnum) {
+        return serviceCache.get(buildCacheKey(appId,codeGenTypeEnum),key->createAiCodeGenerateService(appId,codeGenTypeEnum));
     }
 
 
-    private AiCodegeneraorService createAiCodeGenerateService(long appId) {
+    private AiCodegeneraorService createAiCodeGenerateService(long appId, CodeGenTypeEnum codeGenTypeEnum) {
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
@@ -55,15 +72,36 @@ public class AiCodeGenerateServiceFactory {
                 .build();
         //从数据库中加载对话记录
         chatHistoryService.LoadChatMemoryToMemory(appId, chatMemory, 20);
-        return AiServices.builder(AiCodegeneraorService.class)
-                .chatModel(chatModel)
-                .streamingChatModel(streamingChatModel)
-                .chatMemory(chatMemory)
-                .build();
+        return switch (codeGenTypeEnum) {
+            case HTML,MULTI_FILE -> AiServices.builder(AiCodegeneraorService.class)
+                    .chatModel(chatModel)
+                    .streamingChatModel(streamingChatModel)
+                    .chatMemory(chatMemory)
+                    .build();
+
+            case VUE_PROJECT ->  AiServices.builder(AiCodegeneraorService.class)
+                    .streamingChatModel(reasoningStreamingChatModel)
+                    .chatMemoryProvider(memoryId -> chatMemory)
+                    .tools(new FileWriteTool()) // 调用工具
+                    .hallucinatedToolNameStrategy(toolExecutionRequest ->
+                            ToolExecutionResultMessage.from(toolExecutionRequest,"Error : there are no tools called " + toolExecutionRequest.name())) // 处理工具幻觉问题
+                    .build();
+            default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,"不支持的代码生成类型：" + codeGenTypeEnum.getValue());
+        };
     }
 
     @Bean
     public AiCodegeneraorService aiCodegeneraorService(){
-        return getAiCodeGenerateServiceFactory(0);
+        return getAiCodeGenerateService(0);
+    }
+
+    /**
+     * 构造缓存Key
+     * @param appId
+     * @param codeGenTypeEnum
+     * @return
+     */
+    private String buildCacheKey(long appId, CodeGenTypeEnum codeGenTypeEnum) {
+        return appId + "_" + codeGenTypeEnum.getValue();
     }
 }

@@ -33,7 +33,7 @@ public class AiCodeGeneratorFacade {
         if (codeGenType == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
-        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateService(appId,codeGenType);
         return switch (codeGenType){
             case HTML -> {
                 HtmlCodeResult htmlCodeResult = aiCodegeneraorService.generateHtmlCode(userPrompt);
@@ -59,7 +59,7 @@ public class AiCodeGeneratorFacade {
         if (codeGenType == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
-        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateService(appId,codeGenType);
         return switch (codeGenType){
             case HTML -> {
                 Flux<String> codeStream = aiCodegeneraorService.generateHtmlCodeStream(userPrompt);
@@ -71,6 +71,14 @@ public class AiCodeGeneratorFacade {
                 Flux<String> codeStream = aiCodegeneraorService.generateMultiFileCodeStream(userPrompt);
                 // 累积完整响应，便于流结束后进行整体解析
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE,appId);
+            }
+            case VUE_PROJECT -> {
+                Flux<String> codeStream = aiCodegeneraorService.generateVueGenProjectSystemPrompt(appId, userPrompt);
+                // Vue 工程模式的流式生成通常伴随工具调用，工具调用完成
+                yield  processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE,appId);
+            }
+            default -> {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持类型" + codeGenType.getValue());
             }
         };
     }
@@ -110,7 +118,7 @@ public class AiCodeGeneratorFacade {
      * @return 保存后的目录/文件对象
      */
     private File generateAndSaveMutilFileCode(String userPrompt,Long appId) {
-        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateService(appId);
 
         MultiFileCodeResult multiFileCodeResult = aiCodegeneraorService.generateMultiFileCode(userPrompt);
 
@@ -124,7 +132,7 @@ public class AiCodeGeneratorFacade {
      * @return 保存后的目录/文件对象
      */
     private File generateAndSaveHtmlCode(String userPrompt,Long appId) {
-        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateServiceFactory(appId);
+        AiCodegeneraorService aiCodegeneraorService = aiCodeGenerateServiceFactory.getAiCodeGenerateService(appId);
 
         HtmlCodeResult htmlCodeResult = aiCodegeneraorService.generateHtmlCode(userPrompt);
 
