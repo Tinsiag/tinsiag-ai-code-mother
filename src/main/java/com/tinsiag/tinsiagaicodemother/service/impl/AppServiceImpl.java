@@ -9,6 +9,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
+import com.tinsiag.tinsiagaicodemother.core.handle.StreamHandlerExecutor;
 import com.tinsiag.tinsiagaicodemother.model.dto.App.AppQueryRequest;
 import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
 import com.tinsiag.tinsiagaicodemother.core.AiCodeGeneratorFacade;
@@ -53,6 +54,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
     @Resource
     private ChatHistoryService chatHistoryService;
+
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
 
     @Override
     public AppVO getAppVO(App app) {
@@ -132,22 +136,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         }
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateCodeAndSaveStream(message, codeGenTypeEnum, appId);
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        return contentFlux
-                .map(chunk -> {
-                    aiResponseBuilder.append(chunk);
-                    return chunk;
-                })
-                .doOnComplete(() -> {
-                    String aiResponse = aiResponseBuilder.toString();
-                    if (StrUtil.isNotBlank(aiResponse)) {
-                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                    }
-                })
-                .doOnError(error -> {
-                    String errorMessage = "AI回复失败: " + error.getMessage();
-                    chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                });
+        return streamHandlerExecutor.streamHandlerExecutor(contentFlux,codeGenTypeEnum,chatHistoryService,appId,loginUser);
     }
 
     @Override

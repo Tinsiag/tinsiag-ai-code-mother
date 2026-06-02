@@ -1,17 +1,27 @@
 package com.tinsiag.tinsiagaicodemother.core;
 
+import cn.hutool.json.JSONUtil;
 import com.tinsiag.tinsiagaicodemother.ai.AiCodeGenerateServiceFactory;
 import com.tinsiag.tinsiagaicodemother.ai.AiCodegeneraorService;
 import com.tinsiag.tinsiagaicodemother.ai.model.HtmlCodeResult;
 import com.tinsiag.tinsiagaicodemother.ai.model.MultiFileCodeResult;
+import com.tinsiag.tinsiagaicodemother.ai.model.message.AiResponseMessage;
+import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolExecutedMessage;
+import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolRequestMessage;
 import com.tinsiag.tinsiagaicodemother.core.parser.CodeParserExecutor;
 import com.tinsiag.tinsiagaicodemother.core.saver.CodeFileSaverExecutor;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.service.TokenStream;
+import dev.langchain4j.service.tool.ToolExecution;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.View;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -21,6 +31,8 @@ public class AiCodeGeneratorFacade {
     // 注入 AI 代码生成服务，负责根据用户提示词生成 HTML / 多文件代码内容
     @Resource
     private AiCodeGenerateServiceFactory aiCodeGenerateServiceFactory;
+    @Autowired
+    private View error;
 
     /**
      * 统一入口：根据用户输入的提示词和生成类型，生成代码并保存到本地。
@@ -73,14 +85,43 @@ public class AiCodeGeneratorFacade {
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE,appId);
             }
             case VUE_PROJECT -> {
-                Flux<String> codeStream = aiCodegeneraorService.generateVueGenProjectSystemPrompt(appId, userPrompt);
+                TokenStream tokenStream = aiCodegeneraorService.generateVueGenProjectSystemPrompt(appId, userPrompt);
                 // Vue 工程模式的流式生成通常伴随工具调用，工具调用完成
-                yield  processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE,appId);
+                yield  processTokenStream(tokenStream);
             }
             default -> {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持类型" + codeGenType.getValue());
             }
         };
+    }
+
+    private Flux<String> processTokenStream(TokenStream tokenStream) {
+        return Flux.create(sink -> {
+            tokenStream
+                    .onPartialResponse((String partialResponse) -> {
+                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                    })
+                    .onPartialToolCall(partialToolCall -> {
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(partialToolCall);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                    })
+                    .beforeToolExecution(beforeToolExecution -> {
+                        ToolExecutionRequest request = beforeToolExecution.request();
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(request);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                    })
+                    .onCompleteResponse((ChatResponse response) -> sink.complete())
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        sink.error(error);
+                    })
+                    .start();
+        });
     }
 
     /**
