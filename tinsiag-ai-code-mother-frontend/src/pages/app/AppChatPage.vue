@@ -51,6 +51,9 @@ let eventSource: EventSource | undefined
 let pendingAssistantContent = ''
 let pendingAssistantMessage: ChatMessage | undefined
 let renderTimer: ReturnType<typeof window.setTimeout> | undefined
+let previewRequestSeq = 0
+const PREVIEW_READY_RETRY_COUNT = 30
+const PREVIEW_READY_RETRY_DELAY = 1000
 
 const escapeHtml = (value: string) =>
   value
@@ -93,6 +96,42 @@ const previewUrl = computed(() => {
 })
 
 const renderMarkdown = (content: string) => markdown.render(content)
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+const checkPreviewAvailable = async (url: string) => {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'include',
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+const refreshPreviewWhenAvailable = async () => {
+  const url = previewUrl.value
+  const requestSeq = ++previewRequestSeq
+  previewReady.value = false
+  if (!url) {
+    return
+  }
+  for (let i = 0; i < PREVIEW_READY_RETRY_COUNT; i += 1) {
+    if (requestSeq !== previewRequestSeq) {
+      return
+    }
+    if (await checkPreviewAvailable(url)) {
+      if (requestSeq === previewRequestSeq) {
+        previewReady.value = true
+      }
+      return
+    }
+    await sleep(PREVIEW_READY_RETRY_DELAY)
+  }
+}
 
 const handleUserAvatarError = () => {
   userAvatarLoadFailed.value = true
@@ -227,7 +266,7 @@ const finishGenerating = async () => {
   pendingAssistantContent = ''
   generating.value = false
   await fetchApp()
-  previewReady.value = true
+  refreshPreviewWhenAvailable()
   messages.value = messages.value.map((item) => {
     if (!item.loading) {
       return item
@@ -333,7 +372,11 @@ onMounted(async () => {
   }
   await fetchApp()
   await fetchHistory()
-  previewReady.value = Boolean(previewUrl.value && messages.value.length >= 2)
+  if (previewUrl.value && messages.value.length >= 2) {
+    refreshPreviewWhenAvailable()
+  } else {
+    previewReady.value = false
+  }
   const autoPrompt = typeof route.query.prompt === 'string' ? route.query.prompt : ''
   if (isOwnApp.value && messages.value.length === 0 && (autoPrompt || appInfo.value?.initPrompt)) {
     sendMessage(autoPrompt || appInfo.value?.initPrompt)
@@ -341,6 +384,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  previewRequestSeq += 1
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   clearRenderTimer()
   closeEventSource()

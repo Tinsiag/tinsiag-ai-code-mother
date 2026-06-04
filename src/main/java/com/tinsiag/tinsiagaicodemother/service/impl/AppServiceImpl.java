@@ -9,6 +9,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
+import com.tinsiag.tinsiagaicodemother.core.builder.VueProjectBuilder;
 import com.tinsiag.tinsiagaicodemother.core.handle.StreamHandlerExecutor;
 import com.tinsiag.tinsiagaicodemother.model.dto.App.AppQueryRequest;
 import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
@@ -54,9 +55,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
     @Resource
     private ChatHistoryService chatHistoryService;
-
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
     @Resource
     private StreamHandlerExecutor streamHandlerExecutor;
+
 
     @Override
     public AppVO getAppVO(App app) {
@@ -188,6 +191,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         File sourceDir = new File(sourceDirPath);
         if (!sourceDir.exists() || !sourceDir.isDirectory()) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"应用路径不存在，请先生成应用");
+        }
+        //vue 项目特殊处理
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        if (codeGenTypeEnum == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
+        }
+        if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
+            boolean buildResult = vueProjectBuilder.buildProject(sourceDirPath);
+            if (!buildResult) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "构建Vue项目失败,请重试");
+            }
+            File distDirectory = new File(sourceDirPath, "dist");
+            if (!distDirectory.exists() || !distDirectory.isDirectory()) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Vue项目构建完成，但dist目录不存在");
+            }
+            sourceDir = distDirectory;
         }
         //7.部署代码（复制文件到部署目录）
         String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;

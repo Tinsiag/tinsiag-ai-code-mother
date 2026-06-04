@@ -9,11 +9,12 @@ import com.tinsiag.tinsiagaicodemother.ai.model.message.StreamMessage;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.StreamMessageTypeEnum;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolExecutedMessage;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolRequestMessage;
-import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
-import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
+import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
+import com.tinsiag.tinsiagaicodemother.core.builder.VueProjectBuilder;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.tinsiag.tinsiagaicodemother.service.ChatHistoryService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -28,6 +29,8 @@ import java.util.Set;
 @Slf4j
 @Component
 public class JsonMessageStreamHandler {
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 处理 TokenStream（VUE_PROJECT）
@@ -55,7 +58,18 @@ public class JsonMessageStreamHandler {
                 .doOnComplete(() -> {
                     // 流式响应完成后，添加 AI 消息到对话历史
                     String aiResponse = chatHistoryStringBuilder.toString();
-                    chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    try {
+                        chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    } catch (Exception e) {
+                        log.error("Save AI chat history failed, appId: {}, error: {}", appId, e.getMessage());
+                    }
+                    String projectPath = FileUtil
+                            .file(AppConstant.CODE_OUTPUT_ROOT_DIR, "vue_project_" + appId)
+                            .getAbsolutePath();
+                    boolean buildResult = vueProjectBuilder.buildProject(projectPath);
+                    if (!buildResult) {
+                        log.error("Vue project build failed, appId: {}, projectPath: {}", appId, projectPath);
+                    }
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
@@ -63,7 +77,7 @@ public class JsonMessageStreamHandler {
                         String errorMessage = "AI回复失败: " + error.getMessage();
                         chatHistoryService.addChatMessage(appId, errorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     } catch (Exception e) {
-                        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "记录AI回复失败的错误消息时发生异常: " + e.getMessage());
+                        log.error("Save AI error chat history failed, appId: {}, error: {}", appId, e.getMessage());
                     }
                 });
     }
