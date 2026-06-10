@@ -17,6 +17,13 @@ public interface AppConstant {
     String CODE_OUTPUT_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
 
     /**
+     * 网页截图目录
+     */
+
+    String WEB_SCREENSHOT_DIR = System.getProperty("user.dir") + "/tmp/web_screenshot";
+
+
+    /**
      * 应用部署目录
      */
     String CODE_DEPLOY_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_deploy";
@@ -25,4 +32,5 @@ public interface AppConstant {
      * 应用部署域名
      */
     String CODE_DEPLOY_HOST = "http://localhost";
+
 }

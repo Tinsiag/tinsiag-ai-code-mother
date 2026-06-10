@@ -28,6 +28,7 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <selenium.version>4.41.0</selenium.version>
     </properties>
     <dependencies>
         <dependency>
@@ -109,14 +110,14 @@
             <version>1.14.0-beta24</version>
             <scope>compile</scope>
         </dependency>
-<!--        redis依赖-->
+        <!--        redis依赖-->
 
         <dependency>
-          <groupId>dev.langchain4j</groupId>
-          <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
-          <version>1.1.0-beta7</version>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
+            <version>1.1.0-beta7</version>
         </dependency>
-<!--        本地缓存-->
+        <!--        本地缓存-->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
@@ -127,7 +128,24 @@
             <groupId>org.springframework.session</groupId>
             <artifactId>spring-session-data-redis</artifactId>
         </dependency>
-
+        <!--        selenium-->
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
+        <!--        WebDriver Manager-->
+        <dependency>
+            <groupId>io.github.bonigarcia</groupId>
+            <artifactId>webdrivermanager</artifactId>
+            <version>6.3.4</version>
+        </dependency>
+        <!--        七牛云-->
+        <dependency>
+          <groupId>com.qiniu</groupId>
+          <artifactId>qiniu-java-sdk</artifactId>
+          <version>[7.19.0, 7.19.99]</version>
+        </dependency>
 
 
     </dependencies>

@@ -25,6 +25,7 @@ import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.UserVO;
 import com.tinsiag.tinsiagaicodemother.service.AppService;
 import com.tinsiag.tinsiagaicodemother.service.ChatHistoryService;
+import com.tinsiag.tinsiagaicodemother.service.ScreenshotService;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +60,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     private VueProjectBuilder vueProjectBuilder;
     @Resource
     private StreamHandlerExecutor streamHandlerExecutor;
-
+    @Resource
+    private ScreenshotService screenshotService;
 
     @Override
     public AppVO getAppVO(App app) {
@@ -225,7 +227,25 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
             throw new BusinessException(ErrorCode.OPERATION_ERROR,"部署应用失败，数据库更新异常:");
         }
         //9.返回可访问的URL
-        return String.format("%s/%s",AppConstant.CODE_DEPLOY_HOST,deployKey);
+        String appDeployUrl = String.format("%s/%s",AppConstant.CODE_DEPLOY_HOST,deployKey);
+
+        generateAppScreenshotAsync(appId, appDeployUrl);
+        return appDeployUrl;
+    }
+
+    @Override
+    public void generateAppScreenshotAsync(Long appId, String appUrl){
+        Thread.startVirtualThread(() -> {
+            String screenshotUrl = screenshotService.generateAndUploadScreenshot(appUrl);
+            if(!StrUtil.isBlank(screenshotUrl)){
+                App app = new App();
+                app.setId(appId);
+                app.setCover(screenshotUrl);
+                boolean updateResult = this.updateById(app);
+                ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用截图URL失败");
+
+            }
+        });
     }
 
 
