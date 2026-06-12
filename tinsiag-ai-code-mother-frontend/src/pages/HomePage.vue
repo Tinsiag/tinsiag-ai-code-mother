@@ -129,7 +129,7 @@ const removeApp = async (app: API.AppVO) => {
   if (!app.id) {
     return
   }
-  const res = await deleteApp({ id: app.id })
+  const res = await deleteApp({ id: app.id } as unknown as API.DeleteRequest)
   if (res.data.code === 0) {
     message.success('删除成功')
     fetchMyApps()

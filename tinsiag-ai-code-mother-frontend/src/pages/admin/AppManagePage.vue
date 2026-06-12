@@ -86,7 +86,7 @@ const doDelete = async (id?: string) => {
   if (!id) {
     return
   }
-  const res = await deleteAppByAdmin({ id })
+  const res = await deleteAppByAdmin({ id } as unknown as API.DeleteRequest)
   if (res.data.code === 0 && res.data.data) {
     message.success('删除成功')
     fetchData()

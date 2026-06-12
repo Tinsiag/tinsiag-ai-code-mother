@@ -40,6 +40,9 @@ export const CODE_GEN_TYPE_CONFIG = {
   },
 }
 
+export const getCodeGenTypeLabel = (codeGenType?: string) =>
+  CODE_GEN_TYPE_CONFIG[codeGenType as CodeGenTypeEnum]?.label || codeGenType || '-'
+
 export const getAppPreviewUrl = (codeGenType: string, appId: string) => {
   const basePath = `${codeGenType}_${appId}/`
   // 如果是 Vue 项目，浏览地址需要添加 dist 后缀

@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.tinsiag.tinsiagaicodemother.ai.AiCodeGenTypeRoutingService;
 import com.tinsiag.tinsiagaicodemother.annotation.AuthCheck;
 import com.tinsiag.tinsiagaicodemother.common.*;
 import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
@@ -16,9 +17,11 @@ import com.tinsiag.tinsiagaicodemother.model.dto.App.*;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
+import com.tinsiag.tinsiagaicodemother.service.ProjectDownloadService;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +30,7 @@ import com.tinsiag.tinsiagaicodemother.service.AppService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +50,10 @@ public class AppController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    @Resource
+    private ProjectDownloadService projectDownloadService;
     @GetMapping(value = "/chat/generate/code",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> Chat2GenCode(@RequestParam Long appId ,@RequestParam String message ,HttpServletRequest request){
         // 参数校验
@@ -88,6 +96,27 @@ public class AppController {
         return ResultUtils.success(deployUrl);
     }
 
+
+     @GetMapping("/download/{appId}")
+     public void downloadAppCode(@PathVariable Long appId, HttpServletResponse response, HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID无效");
+         App app = appService.getById(appId);
+         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR,"应用不存在");
+         if(!app.getId().equals(appId)){
+             throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"无权下载该应用");
+         }
+         String codeGenType = app.getCodeGenType();
+         String sourceDirName = codeGenType + "_" + appId;
+         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+         File codeDir = new File(sourceDirPath);
+         if(!codeDir.exists() ||  !codeDir.isDirectory()){
+             throw  new BusinessException(ErrorCode.NOT_FOUND_ERROR,"应用代码文件不存在,请先生成代码");
+         }
+         String downloadFileName = String.valueOf(appId);
+         projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
+     }
+
+
     /**
      * 创建应用
      *
@@ -109,8 +138,9 @@ public class AppController {
         app.setUserId(loginUser.getId());
         // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-
-        app.setCodeGenType(CodeGenTypeEnum.VUE_PROJECT.getValue());
+        // 使用AI 智能选择代码生成的类型
+        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        app.setCodeGenType(selectedCodeGenType.getValue());
         // 插入数据库
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);

@@ -7,13 +7,14 @@ import MarkdownIt from 'markdown-it'
 import 'highlight.js/styles/github.css'
 import {
   CloudUploadOutlined,
+  DownloadOutlined,
   EditOutlined,
   RocketOutlined,
 } from '@ant-design/icons-vue'
-import { deployApp, getAppVoById } from '@/api/appController'
+import { deployApp, downloadAppCode, getAppVoById } from '@/api/appController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import PromptComposer from '@/components/app/PromptComposer.vue'
-import { getAppPreviewUrl } from '@/config/domain'
+import { getAppPreviewUrl, getCodeGenTypeLabel } from '@/config/domain'
 import { useLoginUserStore } from '@/stores/LoginUser'
 
 type ChatMessage = {
@@ -41,6 +42,7 @@ const messages = ref<ChatMessage[]>([])
 const inputMessage = ref('')
 const generating = ref(false)
 const deploying = ref(false)
+const downloading = ref(false)
 const previewReady = ref(false)
 const messageListRef = ref<HTMLElement>()
 const historyLoading = ref(false)
@@ -98,6 +100,37 @@ const previewUrl = computed(() => {
 const renderMarkdown = (content: string) => markdown.render(content)
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+const safeDecodeURIComponent = (value: string) => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+const parseDownloadFileName = (contentDisposition?: string) => {
+  if (!contentDisposition) {
+    return ''
+  }
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return safeDecodeURIComponent(utf8Match[1])
+  }
+  const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  return fileNameMatch?.[1] ? safeDecodeURIComponent(fileNameMatch[1]) : ''
+}
+
+const saveBlob = (blob: Blob, fileName: string) => {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
 
 const checkPreviewAvailable = async (url: string) => {
   try {
@@ -340,6 +373,26 @@ const sendMessage = async (text?: string) => {
   }
 }
 
+const doDownload = async () => {
+  if (!appId.value || downloading.value) {
+    return
+  }
+  downloading.value = true
+  try {
+    const res = await downloadAppCode(
+      { appId: appId.value } as unknown as API.downloadAppCodeParams,
+      { responseType: 'blob' },
+    )
+    const fileName = parseDownloadFileName(res.headers['content-disposition']) || `${appName.value}.zip`
+    saveBlob(res.data, fileName)
+    message.success('下载成功')
+  } catch {
+    message.error('下载失败，请稍后重试')
+  } finally {
+    downloading.value = false
+  }
+}
+
 const doDeploy = async () => {
   if (!appId.value) {
     return
@@ -397,12 +450,21 @@ onBeforeUnmount(() => {
       <a-space class="app-title" @click="router.push(`/app/edit/${appId}`)">
         <a-avatar src="/favicon.ico" :size="36" />
         <span>{{ appName }}</span>
+        <a-tag v-if="appInfo?.codeGenType" color="blue" class="code-gen-type-tag">
+          {{ getCodeGenTypeLabel(appInfo.codeGenType) }}
+        </a-tag>
         <EditOutlined />
       </a-space>
-      <a-button type="primary" :loading="deploying" @click="doDeploy">
-        <template #icon><RocketOutlined /></template>
-        部署
-      </a-button>
+      <a-space>
+        <a-button :loading="downloading" @click="doDownload">
+          <template #icon><DownloadOutlined /></template>
+          下载代码
+        </a-button>
+        <a-button type="primary" :loading="deploying" @click="doDeploy">
+          <template #icon><RocketOutlined /></template>
+          部署
+        </a-button>
+      </a-space>
     </header>
 
     <section class="chat-workspace">
@@ -498,6 +560,11 @@ onBeforeUnmount(() => {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.code-gen-type-tag {
+  margin-inline-end: 0;
+  font-weight: 500;
 }
 
 .chat-workspace {

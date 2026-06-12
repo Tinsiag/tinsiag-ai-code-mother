@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs'
 import { computed } from 'vue'
-import { getAppDeployUrl, getAppPreviewUrl } from '@/config/domain'
+import { getAppDeployUrl, getAppPreviewUrl, getCodeGenTypeLabel } from '@/config/domain'
 import { getAppCover, getAppTitle, getAppUserName, type LoginUserLike } from '@/utils/appDisplay'
 
 const props = defineProps<{
@@ -48,7 +48,7 @@ const close = () => emit('update:open', false)
           {{ getAppUserName(props.app, props.loginUser) }}
         </a-descriptions-item>
         <a-descriptions-item label="生成类型">
-          {{ props.app.codeGenType || '-' }}
+          {{ getCodeGenTypeLabel(props.app.codeGenType) }}
         </a-descriptions-item>
         <a-descriptions-item label="优先级">
           {{ props.app.priority ?? 0 }}
