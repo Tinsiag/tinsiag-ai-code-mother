@@ -15,7 +15,9 @@ import { deployApp, downloadAppCode, getAppVoById } from '@/api/appController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import PromptComposer from '@/components/app/PromptComposer.vue'
 import { getAppPreviewUrl, getCodeGenTypeLabel } from '@/config/domain'
+import request from '@/request'
 import { useLoginUserStore } from '@/stores/LoginUser'
+import { appendElementInfoToPrompt, VisualEditor, type ElementInfo } from '@/utils/visualEditor'
 
 type ChatMessage = {
   role: 'user' | 'assistant'
@@ -44,6 +46,9 @@ const generating = ref(false)
 const deploying = ref(false)
 const downloading = ref(false)
 const previewReady = ref(false)
+const previewIframeRef = ref<HTMLIFrameElement>()
+const isEditMode = ref(false)
+const selectedElementInfo = ref<ElementInfo | null>(null)
 const messageListRef = ref<HTMLElement>()
 const historyLoading = ref(false)
 const hasMoreHistory = ref(false)
@@ -54,6 +59,11 @@ let pendingAssistantContent = ''
 let pendingAssistantMessage: ChatMessage | undefined
 let renderTimer: ReturnType<typeof window.setTimeout> | undefined
 let previewRequestSeq = 0
+const visualEditor = new VisualEditor({
+  onElementSelected: (elementInfo) => {
+    selectedElementInfo.value = elementInfo
+  },
+})
 const PREVIEW_READY_RETRY_COUNT = 30
 const PREVIEW_READY_RETRY_DELAY = 1000
 
@@ -86,6 +96,12 @@ const isOwnApp = computed(() => {
   return Boolean(userId && appUserId && String(userId) === String(appUserId))
 })
 const canChat = computed(() => Boolean(appInfo.value && isOwnApp.value))
+const selectedElementClassNames = computed(() =>
+  selectedElementInfo.value?.className
+    .split(/\s+/)
+    .filter((className) => className && !className.startsWith('edit-'))
+    .join('.') || '',
+)
 const userAvatar = computed(() =>
   userAvatarLoadFailed.value ? DEFAULT_USER_AVATAR : loginUserStore.loginUser.userAvatar || DEFAULT_USER_AVATAR,
 )
@@ -291,6 +307,41 @@ const parseSseChunk = (rawData: string) => {
   }
 }
 
+const handleVisualEditorMessage = (event: MessageEvent) => {
+  visualEditor.handleIframeMessage(event)
+}
+
+const handlePreviewIframeLoad = () => {
+  const iframe = previewIframeRef.value
+  if (!iframe) {
+    return
+  }
+  visualEditor.init(iframe)
+  visualEditor.onIframeLoad()
+}
+
+const clearSelectedElement = () => {
+  selectedElementInfo.value = null
+  visualEditor.clearSelection()
+}
+
+const resetVisualEditState = () => {
+  selectedElementInfo.value = null
+  isEditMode.value = false
+  visualEditor.disableEditMode()
+}
+
+const toggleEditMode = () => {
+  const iframe = previewIframeRef.value
+  if (!previewReady.value || !iframe) {
+    message.warning('请等待页面加载完成')
+    return
+  }
+
+  visualEditor.init(iframe)
+  isEditMode.value = visualEditor.toggleEditMode()
+}
+
 const finishGenerating = async () => {
   closeEventSource()
   clearRenderTimer()
@@ -315,11 +366,13 @@ const finishGenerating = async () => {
 }
 
 const sendMessage = async (text?: string) => {
-  const content = (text ?? inputMessage.value).trim()
-  if (!content || !appId.value || generating.value || !canChat.value) {
+  const rawContent = (text ?? inputMessage.value).trim()
+  if (!rawContent || !appId.value || generating.value || !canChat.value) {
     return
   }
+  const content = appendElementInfoToPrompt(rawContent, selectedElementInfo.value)
   inputMessage.value = ''
+  resetVisualEditState()
   previewReady.value = false
   messages.value.push({ role: 'user', content })
 
@@ -340,7 +393,7 @@ const sendMessage = async (text?: string) => {
     appId: String(appId.value),
     message: content,
   })
-  eventSource = new EventSource(`http://localhost:8123/api/app/chat/generate/code?${params}`, {
+  eventSource = new EventSource(`${request.defaults.baseURL || '/api'}/app/chat/generate/code?${params}`, {
     withCredentials: true,
   })
 
@@ -420,6 +473,7 @@ const doDeploy = async () => {
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('message', handleVisualEditorMessage)
   if (!loginUserStore.loginUser.id) {
     await loginUserStore.fetchLoginUser().catch(() => {})
   }
@@ -439,6 +493,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   previewRequestSeq += 1
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('message', handleVisualEditorMessage)
+  resetVisualEditState()
   clearRenderTimer()
   closeEventSource()
 })
@@ -511,19 +567,64 @@ onBeforeUnmount(() => {
           :class="{ disabled: !canChat }"
           :title="canChat ? '' : '无法在别人的作品下对话哦~'"
         >
+          <a-alert
+            v-if="selectedElementInfo"
+            class="selected-element-alert"
+            type="info"
+            show-icon
+            closable
+            @close="clearSelectedElement"
+          >
+            <template #message>
+              <div class="selected-element-info">
+                <div class="element-header">
+                  <span class="element-label">选中元素：</span>
+                  <span class="element-tag">{{ selectedElementInfo.tagName.toLowerCase() }}</span>
+                  <span v-if="selectedElementInfo.id" class="element-id">
+                    #{{ selectedElementInfo.id }}
+                  </span>
+                  <span v-if="selectedElementClassNames" class="element-class">
+                    .{{ selectedElementClassNames }}
+                  </span>
+                </div>
+                <div class="element-details">
+                  <div v-if="selectedElementInfo.textContent" class="element-item">
+                    内容：{{ selectedElementInfo.textContent.substring(0, 50) }}{{
+                      selectedElementInfo.textContent.length > 50 ? '...' : ''
+                    }}
+                  </div>
+                  <div v-if="selectedElementInfo.pagePath" class="element-item">
+                    页面路径：{{ selectedElementInfo.pagePath }}
+                  </div>
+                  <div class="element-item">
+                    选择器：
+                    <code class="element-selector-code">{{ selectedElementInfo.selector }}</code>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </a-alert>
           <PromptComposer
             v-model:value="inputMessage"
             :disabled="!canChat"
             :loading="generating"
+            :edit-active="isEditMode"
             show-edit
             placeholder="描述越详细，页面越具体，可以一步一步完善生成效果"
+            @edit="toggleEditMode"
             @submit="sendMessage()"
           />
         </div>
       </aside>
 
-      <section class="preview-panel">
-        <iframe v-if="previewReady && previewUrl" :src="previewUrl" title="应用预览" />
+      <section class="preview-panel" :class="{ editing: isEditMode }">
+        <iframe
+          v-if="previewReady && previewUrl"
+          ref="previewIframeRef"
+          :src="previewUrl"
+          title="应用预览"
+          @load="handlePreviewIframeLoad"
+        />
         <div v-else class="preview-empty">
           <CloudUploadOutlined />
           <h2>{{ generating ? '正在生成网页' : '网页将在生成完成后展示' }}</h2>
@@ -715,6 +816,58 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
+.selected-element-alert {
+  margin-bottom: 12px;
+}
+
+.selected-element-info {
+  line-height: 1.5;
+}
+
+.element-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.element-label {
+  color: #475467;
+}
+
+.element-tag,
+.element-selector-code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+.element-tag {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.element-id {
+  color: #16a34a;
+}
+
+.element-class {
+  color: #d97706;
+}
+
+.element-item {
+  color: #475467;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.element-selector-code {
+  padding: 2px 5px;
+  color: #d4380d;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 4px;
+}
+
 .preview-panel {
   display: flex;
   flex: 1 1 auto;
@@ -735,6 +888,11 @@ onBeforeUnmount(() => {
   background: #fff;
   border: 1px solid #edf0f4;
   border-radius: 16px;
+}
+
+.preview-panel.editing iframe {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
 }
 
 .preview-empty {

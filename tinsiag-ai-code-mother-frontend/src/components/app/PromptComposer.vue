@@ -13,6 +13,7 @@ const props = withDefaults(
     loading?: boolean
     disabled?: boolean
     showEdit?: boolean
+    editActive?: boolean
     minRows?: number
     maxRows?: number
   }>(),
@@ -21,6 +22,7 @@ const props = withDefaults(
     loading: false,
     disabled: false,
     showEdit: false,
+    editActive: false,
     minRows: 3,
     maxRows: 5,
   },
@@ -29,6 +31,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:value': [value: string]
   submit: []
+  edit: []
 }>()
 </script>
 
@@ -49,25 +52,33 @@ const emit = defineEmits<{
           <template #icon><PaperClipOutlined /></template>
           上传
         </a-button>
-        <a-button v-if="props.showEdit" shape="round" :disabled="props.disabled">
-          <template #icon><EditOutlined /></template>
-          编辑
-        </a-button>
         <a-button shape="round" disabled>
           <template #icon><ThunderboltOutlined /></template>
           优化
         </a-button>
       </a-space>
-      <a-button
-        type="primary"
-        shape="circle"
-        size="large"
-        :loading="props.loading"
-        :disabled="props.disabled"
-        @click="emit('submit')"
-      >
-        <template #icon><ArrowUpOutlined /></template>
-      </a-button>
+      <a-space>
+        <a-button
+          v-if="props.showEdit"
+          shape="round"
+          :type="props.editActive ? 'primary' : 'default'"
+          :disabled="props.disabled || props.loading"
+          @click="emit('edit')"
+        >
+          <template #icon><EditOutlined /></template>
+          {{ props.editActive ? '退出编辑' : '编辑' }}
+        </a-button>
+        <a-button
+          type="primary"
+          shape="circle"
+          size="large"
+          :loading="props.loading"
+          :disabled="props.disabled"
+          @click="emit('submit')"
+        >
+          <template #icon><ArrowUpOutlined /></template>
+        </a-button>
+      </a-space>
     </div>
   </div>
 </template>

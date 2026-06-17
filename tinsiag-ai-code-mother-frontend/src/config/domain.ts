@@ -8,8 +8,10 @@ const joinUrl = (baseUrl: string, path: string) => {
   return normalizedPath ? `${normalizedBaseUrl}/${normalizedPath}` : normalizedBaseUrl
 }
 
-const appDeployDomain = import.meta.env.VITE_APP_DEPLOY_DOMAIN || 'http://localhost'
-const appPreviewDomain = import.meta.env.VITE_APP_PREVIEW_DOMAIN || 'http://localhost:8123/api/static'
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8123/api'
+const appDeployDomain =
+  import.meta.env.VITE_DEPLOY_DOMAIN || import.meta.env.VITE_APP_DEPLOY_DOMAIN || 'http://localhost'
+const appPreviewDomain = import.meta.env.VITE_APP_PREVIEW_DOMAIN || joinUrl(apiBaseUrl, 'static')
 
 export const getAppDeployUrl = (deployKey: string) => joinUrl(appDeployDomain, deployKey)
 
