@@ -9,6 +9,8 @@ import com.tinsiag.tinsiagaicodemother.ai.model.message.StreamMessage;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.StreamMessageTypeEnum;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolExecutedMessage;
 import com.tinsiag.tinsiagaicodemother.ai.model.message.ToolRequestMessage;
+import com.tinsiag.tinsiagaicodemother.ai.tools.BaseTool;
+import com.tinsiag.tinsiagaicodemother.ai.tools.ToolsManager;
 import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
 import com.tinsiag.tinsiagaicodemother.core.builder.VueProjectBuilder;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
@@ -32,6 +34,8 @@ public class JsonMessageStreamHandler {
     @Resource
     private VueProjectBuilder vueProjectBuilder;
 
+    @Resource
+    private ToolsManager toolsManager;
     /**
      * 处理 TokenStream（VUE_PROJECT）
      * 解析 JSON 消息并重组为完整的响应格式
@@ -104,7 +108,8 @@ public class JsonMessageStreamHandler {
                 if (toolId != null && !seenToolIds.contains(toolId)) {
                     // 第一次调用这个工具，记录 ID 并完整返回工具信息
                     seenToolIds.add(toolId);
-                    return "\n\n[🪒选择工具] 写入文件\n\n";
+                    BaseTool tool = toolsManager.getTool(toolRequestMessage.getName());
+                    return tool.generateToolRequestResponse();
                 } else {
                     // 不是第一次调用这个工具，直接返回空
                     return "";
@@ -113,15 +118,7 @@ public class JsonMessageStreamHandler {
             case TOOL_EXECUTED -> {
                 ToolExecutedMessage toolExecutedMessage = JSONUtil.toBean(chunk, ToolExecutedMessage.class);
                 JSONObject jsonObject = JSONUtil.parseObj(toolExecutedMessage.getArguments());
-                String relativePath = jsonObject.getStr("relativePath");
-                String suffix = FileUtil.getSuffix(relativePath);
-                String content = jsonObject.getStr("content");
-                String result = String.format("""
-                        [🔧工具调用] 写入文件 %s
-                        ```%s
-                        %s
-                        ```
-                        """, relativePath, suffix, content);
+                String result = toolsManager.getTool(toolExecutedMessage.getName()).generateToolExecutedResult(jsonObject);
                 // 输出前端和要持久化的内容
                 String output = String.format("\n\n%s\n\n", result);
                 chatHistoryStringBuilder.append(output);

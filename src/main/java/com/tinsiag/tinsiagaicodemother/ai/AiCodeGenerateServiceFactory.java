@@ -2,7 +2,7 @@ package com.tinsiag.tinsiagaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.tinsiag.tinsiagaicodemother.ai.tools.FileWriteTool;
+import com.tinsiag.tinsiagaicodemother.ai.tools.*;
 import com.tinsiag.tinsiagaicodemother.config.ReasoningStreamingChatModelConfig;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
@@ -39,7 +39,11 @@ public class AiCodeGenerateServiceFactory {
     private StreamingChatModel reasoningStreamingChatModel;
 
     @Resource
+    private ToolsManager toolsManager;
+
+    @Resource
     private ChatHistoryService chatHistoryService;
+
     private final Cache<String, AiCodegeneraorService> serviceCache = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofMinutes(30))
@@ -82,7 +86,7 @@ public class AiCodeGenerateServiceFactory {
             case VUE_PROJECT ->  AiServices.builder(AiCodegeneraorService.class)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(new FileWriteTool()) // 调用工具
+                    .tools(toolsManager.getAllTool()) // 调用工具
                     .hallucinatedToolNameStrategy(toolExecutionRequest ->
                             ToolExecutionResultMessage.from(toolExecutionRequest,"Error : there are no tools called " + toolExecutionRequest.name())) // 处理工具幻觉问题
                     .build();
