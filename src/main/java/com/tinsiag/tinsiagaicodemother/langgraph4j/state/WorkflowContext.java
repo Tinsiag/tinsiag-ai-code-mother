@@ -1,5 +1,6 @@
 package com.tinsiag.tinsiagaicodemother.langgraph4j.state;
 
+import com.tinsiag.tinsiagaicodemother.langgraph4j.model.ImageCollectionPlan;
 import com.tinsiag.tinsiagaicodemother.langgraph4j.model.ImageResource;
 import com.tinsiag.tinsiagaicodemother.langgraph4j.model.QualityResult;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
@@ -68,6 +69,19 @@ public class WorkflowContext implements Serializable {
      * 构建成功的目录
      */
     private String buildResultDir;
+    /**
+     * 图片收集计划
+     */
+    private ImageCollectionPlan imageCollectionPlan;
+
+
+    /**
+     * 并发图片收集的中间结果字段
+     */
+    private List<ImageResource> contentImages;
+    private List<ImageResource> illustrations;
+    private List<ImageResource> diagrams;
+    private List<ImageResource> logos;
 
 
     private QualityResult qualityResult;
