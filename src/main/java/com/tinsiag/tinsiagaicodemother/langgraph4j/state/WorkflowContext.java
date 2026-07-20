@@ -1,6 +1,7 @@
 package com.tinsiag.tinsiagaicodemother.langgraph4j.state;
 
 import com.tinsiag.tinsiagaicodemother.langgraph4j.model.ImageResource;
+import com.tinsiag.tinsiagaicodemother.langgraph4j.model.QualityResult;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -67,6 +68,9 @@ public class WorkflowContext implements Serializable {
      * 构建成功的目录
      */
     private String buildResultDir;
+
+
+    private QualityResult qualityResult;
 
     /**
      * 错误信息
