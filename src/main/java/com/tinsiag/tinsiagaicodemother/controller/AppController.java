@@ -26,6 +26,7 @@ import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -56,23 +57,24 @@ public class AppController {
     private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
     @Resource
     private ProjectDownloadService projectDownloadService;
-    @GetMapping(value = "/chat/generate/code",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> Chat2GenCode(@RequestParam Long appId ,@RequestParam String message ,HttpServletRequest request){
+
+    @GetMapping(value = "/chat/generate/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> Chat2GenCode(@RequestParam Long appId, @RequestParam String message, HttpServletRequest request) {
         // 参数校验
-        ThrowUtils.throwIf(appId== null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
         User loginUser = userService.getLoginUser(request);
         Flux<String> contentFlux = appService.chat2GenCode(appId, message, loginUser);
-        return contentFlux.map(chunk->{
-                Map<String,String> wrapper = Map.of("d",chunk);
-                String jsonStr = JSONUtil.toJsonStr(wrapper);
-                return ServerSentEvent.<String>builder()
-                        .data(jsonStr)
-                        .build();
+        return contentFlux.map(chunk -> {
+                    Map<String, String> wrapper = Map.of("d", chunk);
+                    String jsonStr = JSONUtil.toJsonStr(wrapper);
+                    return ServerSentEvent.<String>builder()
+                            .data(jsonStr)
+                            .build();
                 })
                 .concatWith(Mono.just(
                         //发送一个流式结束do
-                        ServerSentEvent.<String> builder()
+                        ServerSentEvent.<String>builder()
                                 .event("done")
                                 .data("")
                                 .build()
@@ -99,24 +101,24 @@ public class AppController {
     }
 
 
-     @GetMapping("/download/{appId}")
-     public void downloadAppCode(@PathVariable Long appId, HttpServletResponse response, HttpServletRequest request) {
-        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID无效");
-         App app = appService.getById(appId);
-         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR,"应用不存在");
-         if(!app.getId().equals(appId)){
-             throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"无权下载该应用");
-         }
-         String codeGenType = app.getCodeGenType();
-         String sourceDirName = codeGenType + "_" + appId;
-         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
-         File codeDir = new File(sourceDirPath);
-         if(!codeDir.exists() ||  !codeDir.isDirectory()){
-             throw  new BusinessException(ErrorCode.NOT_FOUND_ERROR,"应用代码文件不存在,请先生成代码");
-         }
-         String downloadFileName = String.valueOf(appId);
-         projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
-     }
+    @GetMapping("/download/{appId}")
+    public void downloadAppCode(@PathVariable Long appId, HttpServletResponse response, HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        if (!app.getId().equals(appId)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权下载该应用");
+        }
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        File codeDir = new File(sourceDirPath);
+        if (!codeDir.exists() || !codeDir.isDirectory()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "应用代码文件不存在,请先生成代码");
+        }
+        String downloadFileName = String.valueOf(appId);
+        projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
+    }
 
 
     /**
@@ -148,6 +150,7 @@ public class AppController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(app.getId());
     }
+
     /**
      * 更新应用（用户只能更新自己的应用名称）
      *
@@ -178,10 +181,11 @@ public class AppController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
-        /**
+
+    /**
      * 根据 id 获取应用详情
      *
-     * @param id      应用 id
+     * @param id 应用 id
      * @return 应用详情
      */
     @GetMapping("/get/vo")
@@ -193,6 +197,7 @@ public class AppController {
         // 获取封装类（包含用户信息）
         return ResultUtils.success(appService.getAppVO(app));
     }
+
     /**
      * 分页获取当前用户创建的应用列表
      *
@@ -218,6 +223,7 @@ public class AppController {
         appVOPage.setRecords(appVOList);
         return ResultUtils.success(appVOPage);
     }
+
     /**
      * 分页获取精选应用列表
      *
@@ -225,6 +231,9 @@ public class AppController {
      * @return 精选应用列表
      */
     @PostMapping("/good/list/page/vo")
+    @Cacheable(value = "good_app_page", key = "T(com.tinsiag.tinsiagaicodemother.utils.CacheKeyUtils).generateKey(#appQueryRequest)"
+            , condition = "#appQueryRequest.pageNum<=10"
+    )
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         // 限制每页最多 20 个
@@ -267,6 +276,7 @@ public class AppController {
         boolean result = appService.deleteApp(id);
         return ResultUtils.success(result);
     }
+
     /**
      * 管理员删除应用
      *
@@ -311,6 +321,7 @@ public class AppController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
+
     /**
      * 管理员分页获取应用列表
      *
@@ -331,6 +342,7 @@ public class AppController {
         appVOPage.setRecords(appVOList);
         return ResultUtils.success(appVOPage);
     }
+
     /**
      * 管理员根据 id 获取应用详情
      *
@@ -347,8 +359,6 @@ public class AppController {
         // 获取封装类
         return ResultUtils.success(appService.getAppVO(app));
     }
-
-
 
 
 }
