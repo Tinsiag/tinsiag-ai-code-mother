@@ -5,18 +5,22 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
-import com.tinsiag.tinsiagaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.tinsiag.tinsiagaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.tinsiag.tinsiagaicodemother.annotation.AuthCheck;
-import com.tinsiag.tinsiagaicodemother.common.*;
+import com.tinsiag.tinsiagaicodemother.common.BaseResponse;
+import com.tinsiag.tinsiagaicodemother.common.DeleteRequest;
+import com.tinsiag.tinsiagaicodemother.common.ResultUtils;
 import com.tinsiag.tinsiagaicodemother.constant.AppConstant;
 import com.tinsiag.tinsiagaicodemother.constant.UserConstant;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
 import com.tinsiag.tinsiagaicodemother.exception.ThrowUtils;
 import com.tinsiag.tinsiagaicodemother.model.dto.App.*;
+import com.tinsiag.tinsiagaicodemother.model.entity.App;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
+import com.tinsiag.tinsiagaicodemother.service.AppService;
 import com.tinsiag.tinsiagaicodemother.service.ProjectDownloadService;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
 import jakarta.annotation.Resource;
@@ -25,8 +29,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
-import com.tinsiag.tinsiagaicodemother.model.entity.App;
-import com.tinsiag.tinsiagaicodemother.service.AppService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -51,7 +53,7 @@ public class AppController {
     private UserService userService;
 
     @Resource
-    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
     @Resource
     private ProjectDownloadService projectDownloadService;
     @GetMapping(value = "/chat/generate/code",produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -139,7 +141,7 @@ public class AppController {
         // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
         // 使用AI 智能选择代码生成的类型
-        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService().routeCodeGenType(initPrompt);
         app.setCodeGenType(selectedCodeGenType.getValue());
         // 插入数据库
         boolean result = appService.save(app);

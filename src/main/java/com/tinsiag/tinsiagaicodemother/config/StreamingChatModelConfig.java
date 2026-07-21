@@ -12,9 +12,9 @@ import org.springframework.context.annotation.Scope;
 import java.time.Duration;
 
 @Configuration
-@ConfigurationProperties(prefix = "langchain4j.open-ai.reasoning-streaming-chat-model")
+@ConfigurationProperties(prefix = "langchain4j.open-ai.streaming-chat-model")
 @Data
-public class ReasoningStreamingChatModelConfig {
+public class StreamingChatModelConfig {
     private String baseUrl;
     private String apiKey;
     private String modelName;
@@ -26,16 +26,16 @@ public class ReasoningStreamingChatModelConfig {
 
     @Bean
     @Scope("prototype")
-    public StreamingChatModel reasoningStreamingChatModelPrototype() {
+    public StreamingChatModel streamingChatModelPrototype() {
         return OpenAiStreamingChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(modelName)
                 .maxTokens(maxTokens)
+                .temperature(temperature)
                 .logRequests(Boolean.TRUE.equals(logRequests))
                 .logResponses(Boolean.TRUE.equals(logResponses))
                 .timeout(timeout)
-                .temperature(temperature)
                 .httpClientBuilder(SpringRestClient.builder())
                 .accumulateToolCallId(false)
                 .build();
