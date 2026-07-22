@@ -2,6 +2,8 @@ package com.tinsiag.tinsiagaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.tinsiag.tinsiagaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
+import com.tinsiag.tinsiagaicodemother.ai.guardrail.RetryOutputGuardrail;
 import com.tinsiag.tinsiagaicodemother.ai.tools.ToolsManager;
 import com.tinsiag.tinsiagaicodemother.exception.BusinessException;
 import com.tinsiag.tinsiagaicodemother.exception.ErrorCode;
@@ -32,7 +34,6 @@ public class AiCodeGenerateServiceFactory {
 
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
-
 
 
     @Resource
@@ -83,6 +84,8 @@ public class AiCodeGenerateServiceFactory {
                 yield AiServices.builder(AiCodegeneraorService.class)
                         .chatModel(chatModel)
                         .streamingChatModel(streamingChatModelPrototype)
+                        .outputGuardrails(new RetryOutputGuardrail()) // 输出安全检查
+                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 输入安全检查
                         .chatMemory(chatMemory)
                         .build();
             }
@@ -93,6 +96,8 @@ public class AiCodeGenerateServiceFactory {
                         .streamingChatModel(reasoningStreamingChatModelPrototype)
                         .chatMemoryProvider(memoryId -> chatMemory)
                         .tools(toolsManager.getAllTool()) // 调用工具
+                        .outputGuardrails(new RetryOutputGuardrail()) // 输出安全检查
+                        .inputGuardrails(new PromptSafetyInputGuardrail()) // 输入安全检查
                         .hallucinatedToolNameStrategy(toolExecutionRequest ->
                                 ToolExecutionResultMessage.from(toolExecutionRequest, "Error : there are no tools called " + toolExecutionRequest.name())) // 处理工具幻觉问题
                         .build();

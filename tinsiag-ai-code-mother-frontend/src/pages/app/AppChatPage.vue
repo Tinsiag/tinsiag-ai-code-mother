@@ -30,6 +30,10 @@ type SseChunkPayload = {
   d?: string
 }
 
+type BusinessErrorPayload = {
+  message?: string
+}
+
 const DEFAULT_USER_AVATAR = '/default-user-avatar.png'
 
 const route = useRoute()
@@ -396,8 +400,12 @@ const sendMessage = async (text?: string) => {
   eventSource = new EventSource(`${request.defaults.baseURL || '/api'}/app/chat/generate/code?${params}`, {
     withCredentials: true,
   })
+  let streamCompleted = false
 
   eventSource.onmessage = (event) => {
+    if (streamCompleted) {
+      return
+    }
     const chunk = parseSseChunk(event.data)
     if (!chunk) {
       return
@@ -407,10 +415,47 @@ const sendMessage = async (text?: string) => {
   }
 
   eventSource.addEventListener('done', () => {
+    if (streamCompleted) {
+      return
+    }
+    streamCompleted = true
     finishGenerating()
   })
 
+  eventSource.addEventListener('business-error', (event: Event) => {
+    if (streamCompleted) {
+      return
+    }
+    streamCompleted = true
+
+    const rawData = (event as MessageEvent<string>).data
+    let errorMessage = '生成过程中出现错误'
+
+    try {
+      const errorData = JSON.parse(rawData) as BusinessErrorPayload
+      console.error('SSE业务错误事件:', errorData)
+      errorMessage = errorData.message || errorMessage
+    } catch (parseError) {
+      console.error('解析错误事件失败:', parseError, '原始数据:', rawData)
+      errorMessage = '服务器返回错误'
+    }
+
+    clearRenderTimer()
+    pendingAssistantMessage = undefined
+    pendingAssistantContent = ''
+    assistantMessage.content = `❌ ${errorMessage}`
+    assistantMessage.renderedContent = renderMarkdown(assistantMessage.content)
+    assistantMessage.loading = false
+    message.error(errorMessage)
+    generating.value = false
+    closeEventSource()
+  })
+
   eventSource.onerror = () => {
+    if (streamCompleted) {
+      return
+    }
+    streamCompleted = true
     if (pendingAssistantContent || assistantMessage.content) {
       finishGenerating()
     } else {

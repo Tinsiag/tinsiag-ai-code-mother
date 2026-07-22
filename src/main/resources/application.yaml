@@ -26,6 +26,7 @@ spring:
       prefix: "tinsiag-ai-code-mother:"
       password: fuckredis123
       user: default
+      database: 0
 
 server:
   port: 8123

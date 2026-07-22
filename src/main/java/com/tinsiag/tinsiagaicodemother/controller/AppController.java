@@ -20,6 +20,8 @@ import com.tinsiag.tinsiagaicodemother.model.entity.App;
 import com.tinsiag.tinsiagaicodemother.model.entity.User;
 import com.tinsiag.tinsiagaicodemother.model.enums.CodeGenTypeEnum;
 import com.tinsiag.tinsiagaicodemother.model.vo.AppVO;
+import com.tinsiag.tinsiagaicodemother.ratelimter.RateLimit;
+import com.tinsiag.tinsiagaicodemother.ratelimter.enums.RateLimitType;
 import com.tinsiag.tinsiagaicodemother.service.AppService;
 import com.tinsiag.tinsiagaicodemother.service.ProjectDownloadService;
 import com.tinsiag.tinsiagaicodemother.service.UserService;
@@ -59,6 +61,7 @@ public class AppController {
     private ProjectDownloadService projectDownloadService;
 
     @GetMapping(value = "/chat/generate/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "请求过于频繁，请稍后再试")
     public Flux<ServerSentEvent<String>> Chat2GenCode(@RequestParam Long appId, @RequestParam String message, HttpServletRequest request) {
         // 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 id 错误");
